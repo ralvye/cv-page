@@ -1,0 +1,70 @@
+====================================================
+  ralvye.com - Landing Page 3D
+  Pagina personal con monitor CRT voxel en Three.js
+====================================================
+
+
+INICIO RAPIDO (sin instalar nada)
+----------------------------------
+  1. Doble clic en INICIAR.bat
+  2. Se abre automaticamente tu navegador en http://localhost:8080/
+  3. Para detener: cierra la ventana negra del servidor
+
+  Requisito: Windows 7 o superior (incluye PowerShell de serie)
+  No necesita Node.js, Python ni ningun otro programa.
+
+
+ESTRUCTURA DE ARCHIVOS
+-----------------------
+  landing-page/
+  |-- INICIAR.bat       <- Lanzador (doble clic para ver la pagina)
+  |-- servidor.ps1      <- Servidor HTTP en PowerShell (sin instalar nada)
+  |-- INSTRUCCIONES.txt <- Este archivo
+  |-- web/              <- Sitio web compilado (listo para servir)
+  |   |-- index.html
+  |   |-- assets/       <- JS compilado
+  |   |-- draco/        <- Decodificador 3D (sin necesidad de internet)
+  |   |-- crt-draco.glb <- Modelo 3D del monitor CRT
+  |   `-- millennium-falcon.png
+  `-- source/           <- Codigo fuente (para modificar/desarrollar)
+
+
+SI QUIERES MODIFICAR EL CODIGO FUENTE
+---------------------------------------
+  Requisitos previos:
+    - Node.js 18+   -> https://nodejs.org  (descargar LTS)
+    - pnpm          -> ejecutar en terminal: npm install -g pnpm
+
+  Pasos:
+    1. Abrir terminal (CMD o PowerShell) en la carpeta source/
+    2. Instalar dependencias:
+         pnpm install
+    3. Iniciar servidor de desarrollo (con recarga automatica):
+         pnpm dev
+    4. Abrir en el navegador: http://localhost:5173/
+    5. Editar main.js o index.html y los cambios se aplican al instante
+
+  Para generar una nueva version compilada:
+         pnpm build
+  (Los archivos resultantes quedan en source/dist/)
+
+
+TECNOLOGIAS UTILIZADAS
+-----------------------
+  - Three.js 0.183.1   : Motor de renderizado 3D
+  - cannon-es 0.20.0   : Motor de fisica (click para explotar voxels)
+  - Vite 7.3.1         : Bundler y servidor de desarrollo
+
+
+NOTAS TECNICAS
+--------------
+  - El modelo CRT esta comprimido con Draco (crt-draco.glb, 74KB)
+  - Los decoders Draco estan incluidos localmente (web/draco/)
+    por lo que la pagina funciona SIN conexion a internet
+  - La imagen millennium-falcon.png se convierte en voxels 3D en tiempo real
+  - Fisica activada con click: los voxels explotan y caen con gravedad
+
+
+SOPORTE
+-------
+  GitHub: https://github.com/ralvye
