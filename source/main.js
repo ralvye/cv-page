@@ -348,13 +348,26 @@ function applyCRTCurve(geometry, bulge) {
 // Screen backing (dark with slight glow)
 const screenGeo = new THREE.PlaneGeometry(screenW, screenH, 32, 32);
 applyCRTCurve(screenGeo, -0.5);
-const screenMesh = new THREE.Mesh(
-  screenGeo,
-  new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.3 }),
-);
+const screenMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 0.3 });
+const screenMesh = new THREE.Mesh(screenGeo, screenMaterial);
 screenMesh.position.set(0, 0, -0.10);
 screenMesh.scale.set(0.78, 0.82, 1);
 falconGroup.add(screenMesh);
+
+// Power button for monitor
+const powerButtonGeo = new THREE.CircleGeometry(1.2, 32);
+const powerButtonMaterial = new THREE.MeshStandardMaterial({ color: 0x00d400, emissive: 0x33aa00, roughness: 0.4, metalness: 0.3 });
+const powerButton = new THREE.Mesh(powerButtonGeo, powerButtonMaterial);
+powerButton.position.set(12, -14, 1.2);
+powerButton.rotation.y = Math.PI;
+powerButton.name = 'powerButton';
+falconGroup.add(powerButton);
+
+let screenOn = true;
+function toggleMonitorPower() {
+  const nextTheme = screenOn ? 'light' : 'dark';
+  applyTheme(nextTheme);
+}
 
 // Hidden text revealed after explosion
 const hiddenCanvas = document.createElement('canvas');
@@ -393,6 +406,34 @@ scene.add(room);
 const screenLight = new THREE.PointLight(0xddeeff, 40, 80, 1.5);
 screenLight.position.set(-4, -2, -20);
 scene.add(screenLight);
+
+let screenOn = true;
+function applyTheme(theme) {
+  const isLight = theme === 'light';
+  screenOn = !isLight;
+  if (isLight) {
+    screenMaterial.color.setHex(0x000000);
+    screenMaterial.emissive.setHex(0x000000);
+    screenMaterial.emissiveIntensity = 0;
+    crtOverlay.visible = false;
+    screenLight.intensity = 0;
+    document.body.style.background = '#ffffff';
+    powerButtonMaterial.color.setHex(0x222222);
+    powerButtonMaterial.emissive.setHex(0x000000);
+  } else {
+    screenMaterial.color.setHex(0xffffff);
+    screenMaterial.emissive.setHex(0xffffff);
+    screenMaterial.emissiveIntensity = 0.3;
+    crtOverlay.visible = true;
+    screenLight.intensity = 40;
+    document.body.style.background = '#000000';
+    powerButtonMaterial.color.setHex(0x00d400);
+    powerButtonMaterial.emissive.setHex(0x33aa00);
+  }
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+}
+
+const storedTheme = localStorage.getItem('theme');
 
 // CRT screen overlay (scanlines + vignette)
 const overlayGeo = new THREE.PlaneGeometry(screenW, screenH, 32, 32);
@@ -580,7 +621,7 @@ function animate() {
 
   if (firstFrame) {
     firstFrame = false;
-    document.body.style.background = '#f0e6d3';
+    applyTheme(storedTheme === 'light' ? 'light' : 'dark');
     const blackout = document.getElementById('blackout');
     if (blackout) blackout.classList.add('off');
   }
@@ -631,6 +672,13 @@ function handleExplode(clientX, clientY) {
       activateThrowable(t, throwHits[0].point);
       return;
     }
+  }
+
+  // Check power button
+  const powerHits = raycaster.intersectObject(powerButton, true);
+  if (powerHits.length > 0) {
+    toggleMonitorPower();
+    return;
   }
 
   // Then check voxels

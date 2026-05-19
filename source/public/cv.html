@@ -8,11 +8,31 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
+    :root {
+      --bg: #000;
+      --text: #fff;
+      --muted: #bbb;
+      --heading: #fff;
+      --border: #fff;
+      --link: #fff;
+      --link-hover: #ccc;
+      --section-border: #fff;
+    }
+    .light {
+      --bg: #fff;
+      --text: #2a2a2e;
+      --muted: #666;
+      --heading: #000;
+      --border: #000;
+      --link: #2a2a2e;
+      --link-hover: #000;
+      --section-border: #2a2a2e;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { height: 100%; }
     body {
-      background: #fff;
-      color: #2a2a2e;
+      background: var(--bg);
+      color: var(--text);
       font-family: 'Space Mono', monospace;
       line-height: 1.6;
       padding: 2rem;
@@ -24,7 +44,7 @@
     header {
       margin-bottom: 2rem;
       padding-bottom: 1.5rem;
-      border-bottom: 2px solid #000;
+      border-bottom: 2px solid var(--border);
     }
     h1 {
       font-family: 'Libre Baskerville', serif;
@@ -32,11 +52,11 @@
       font-weight: 700;
       letter-spacing: 0.02em;
       margin-bottom: 0.3rem;
-      color: #000;
+      color: var(--heading);
     }
     .profile {
       font-size: 0.95rem;
-      color: #666;
+      color: var(--muted);
       line-height: 1.5;
       margin-top: 0.8rem;
     }
@@ -46,17 +66,17 @@
       gap: 1.5rem;
       margin-top: 1rem;
       font-size: 0.85rem;
-      color: #555;
+      color: var(--muted);
     }
     .contact-info a {
-      color: #2a2a2e;
+      color: var(--link);
       text-decoration: none;
-      border-bottom: 1px solid #ccc;
+      border-bottom: 1px solid var(--border);
       transition: color 0.3s;
     }
     .contact-info a:hover {
-      color: #000;
-      border-bottom-color: #000;
+      color: var(--link-hover);
+      border-bottom-color: var(--link-hover);
     }
     section {
       margin-bottom: 2rem;
@@ -67,9 +87,9 @@
       font-weight: 700;
       letter-spacing: 0.01em;
       margin-bottom: 0.8rem;
-      color: #000;
+      color: var(--heading);
       text-transform: uppercase;
-      border-left: 3px solid #2a2a2e;
+      border-left: 3px solid var(--section-border);
       padding-left: 0.8rem;
     }
     h3 {
@@ -77,17 +97,17 @@
       font-weight: 700;
       margin-top: 0.8rem;
       margin-bottom: 0.2rem;
-      color: #000;
+      color: var(--heading);
     }
     .job-title {
       font-size: 0.85rem;
-      color: #666;
+      color: var(--muted);
       font-weight: 400;
       margin-bottom: 0.3rem;
     }
     .job-description {
       font-size: 0.85rem;
-      color: #555;
+      color: var(--muted);
       margin-bottom: 0.5rem;
     }
     .skills {
@@ -95,7 +115,7 @@
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 1rem;
       font-size: 0.85rem;
-      color: #555;
+      color: var(--muted);
     }
     .skill-item {
       display: flex;
@@ -103,7 +123,7 @@
     }
     .skill-item::before {
       content: "▸";
-      color: #2a2a2e;
+      color: var(--heading);
       font-weight: bold;
       flex-shrink: 0;
     }
@@ -111,7 +131,7 @@
       list-style: none;
       margin-left: 1rem;
       font-size: 0.85rem;
-      color: #555;
+      color: var(--muted);
     }
     li {
       margin-bottom: 0.4rem;
@@ -120,7 +140,7 @@
     }
     li::before {
       content: "●";
-      color: #2a2a2e;
+      color: var(--heading);
       font-weight: bold;
       flex-shrink: 0;
     }
@@ -129,12 +149,12 @@
     }
     .education-school {
       font-weight: 700;
-      color: #000;
+      color: var(--heading);
       font-size: 0.9rem;
     }
     .education-degree {
       font-size: 0.85rem;
-      color: #666;
+      color: var(--muted);
       margin-top: 0.2rem;
     }
     .languages {
@@ -142,7 +162,7 @@
       gap: 2rem;
       flex-wrap: wrap;
       font-size: 0.85rem;
-      color: #555;
+      color: var(--muted);
     }
     .language {
       display: flex;
@@ -150,28 +170,28 @@
     }
     .language-name {
       font-weight: 700;
-      color: #000;
+      color: var(--heading);
     }
     footer {
       margin-top: 3rem;
       padding-top: 1.5rem;
-      border-top: 1px solid #ddd;
+      border-top: 1px solid var(--border);
       text-align: center;
       font-size: 0.75rem;
-      color: #999;
+      color: var(--muted);
     }
     a.back-link {
       display: inline-block;
       margin-bottom: 2rem;
       font-size: 0.8rem;
-      color: #666;
+      color: var(--muted);
       text-decoration: none;
-      border-bottom: 1px solid #ccc;
+      border-bottom: 1px solid var(--border);
       transition: color 0.3s;
     }
     a.back-link:hover {
-      color: #000;
-      border-bottom-color: #000;
+      color: var(--link-hover);
+      border-bottom-color: var(--link-hover);
     }
     @media (max-width: 768px) {
       body { padding: 1.5rem; }
@@ -183,6 +203,7 @@
   </style>
 </head>
 <body>
+  <script>document.body.classList.add(localStorage.getItem('theme') === 'light' ? 'light' : 'dark');</script>
   <div class="container">
     <a href="/" class="back-link">← Volver al sitio</a>
     
