@@ -38,9 +38,10 @@ camera.position.set(Math.sin(angle) * viewDist, 5, Math.cos(angle) * viewDist);
 camera.lookAt(0, -2, 0);
 
 // Renderer
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setClearColor(0x000000, 0); // Transparent background
 document.body.appendChild(renderer.domElement);
 
 // Orbit controls
@@ -355,12 +356,22 @@ screenMesh.scale.set(0.78, 0.82, 1);
 falconGroup.add(screenMesh);
 
 // Power button for monitor
-const powerButtonGeo = new THREE.CircleGeometry(1.2, 32);
+const powerButtonGeo = new THREE.CircleGeometry(2.0, 32);
 const powerButtonMaterial = new THREE.MeshStandardMaterial({ color: 0x00d400, emissive: 0x33aa00, roughness: 0.4, metalness: 0.3 });
 const powerButton = new THREE.Mesh(powerButtonGeo, powerButtonMaterial);
 powerButton.position.set(12, -14, 1.2);
 powerButton.rotation.y = Math.PI;
 powerButton.name = 'powerButton';
+
+// Invisible click target slightly larger than the visible button
+const powerButtonAreaGeo = new THREE.CircleGeometry(4.2, 32);
+const powerButtonAreaMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.001, depthWrite: false });
+const powerButtonArea = new THREE.Mesh(powerButtonAreaGeo, powerButtonAreaMat);
+powerButtonArea.position.copy(powerButton.position);
+powerButtonArea.rotation.copy(powerButton.rotation);
+powerButtonArea.name = 'powerButton';
+
+falconGroup.add(powerButtonArea);
 falconGroup.add(powerButton);
 
 let screenOn = true;
@@ -368,6 +379,7 @@ function toggleMonitorPower() {
   const nextTheme = screenOn ? 'light' : 'dark';
   applyTheme(nextTheme);
 }
+window.toggleMonitorPower = toggleMonitorPower;
 
 // Hidden text revealed after explosion
 const hiddenCanvas = document.createElement('canvas');
@@ -407,28 +419,32 @@ const screenLight = new THREE.PointLight(0xddeeff, 40, 80, 1.5);
 screenLight.position.set(-4, -2, -20);
 scene.add(screenLight);
 
-let screenOn = true;
 function applyTheme(theme) {
   const isLight = theme === 'light';
   screenOn = !isLight;
+  
+  // Apply light/dark class to body for CSS variables
+  document.body.classList.toggle('light', isLight);
+  
+  // Apply theme-specific changes to Three.js scene
   if (isLight) {
     screenMaterial.color.setHex(0x000000);
     screenMaterial.emissive.setHex(0x000000);
     screenMaterial.emissiveIntensity = 0;
     crtOverlay.visible = false;
     screenLight.intensity = 0;
-    document.body.style.background = '#ffffff';
     powerButtonMaterial.color.setHex(0x222222);
     powerButtonMaterial.emissive.setHex(0x000000);
+    roomMat.color.setHex(0xffffff); // White background for light theme
   } else {
     screenMaterial.color.setHex(0xffffff);
     screenMaterial.emissive.setHex(0xffffff);
     screenMaterial.emissiveIntensity = 0.3;
     crtOverlay.visible = true;
     screenLight.intensity = 40;
-    document.body.style.background = '#000000';
     powerButtonMaterial.color.setHex(0x00d400);
     powerButtonMaterial.emissive.setHex(0x33aa00);
+    roomMat.color.setHex(0x8a7e6e); // Dark beige background for dark theme
   }
   localStorage.setItem('theme', isLight ? 'light' : 'dark');
 }
@@ -675,7 +691,7 @@ function handleExplode(clientX, clientY) {
   }
 
   // Check power button
-  const powerHits = raycaster.intersectObject(powerButton, true);
+  const powerHits = raycaster.intersectObjects([powerButton, powerButtonArea], true);
   if (powerHits.length > 0) {
     toggleMonitorPower();
     return;
@@ -683,7 +699,27 @@ function handleExplode(clientX, clientY) {
 
   // Then check voxels
   const hits = raycaster.intersectObjects(getRaycasterMeshes());
-  if (hits.length === 0) return;
+  // If user clicked empty space (no hits on throwables, power button or voxels), consider double-tap
+  if (hits.length === 0) {
+    const now = performance.now();
+    const TAP_MAX_DELAY = 350; // ms
+    const TAP_MAX_DIST = 30; // px
+    if (handleExplode.__lastTap) {
+      const dt = now - handleExplode.__lastTap.t;
+      const dx = clientX - handleExplode.__lastTap.x;
+      const dy = clientY - handleExplode.__lastTap.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dt <= TAP_MAX_DELAY && dist <= TAP_MAX_DIST) {
+        toggleMonitorPower();
+        handleExplode.__lastTap = null;
+        return;
+      }
+    }
+    handleExplode.__lastTap = { t: now, x: clientX, y: clientY };
+    // clear after delay
+    setTimeout(() => { if (handleExplode.__lastTap && performance.now() - handleExplode.__lastTap.t >= TAP_MAX_DELAY) handleExplode.__lastTap = null; }, TAP_MAX_DELAY + 50);
+    return;
+  }
 
   // Convert hit point to penguinGroup local space
   const hitLocal = falconGroup.worldToLocal(hits[0].point.clone());

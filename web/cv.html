@@ -203,7 +203,7 @@
   </style>
 </head>
 <body>
-  <script>document.body.classList.add(localStorage.getItem('theme') === 'light' ? 'light' : 'dark');</script>
+  <script>if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');</script>
   <div class="container">
     <a href="/" class="back-link">← Volver al sitio</a>
     
