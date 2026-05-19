@@ -23,13 +23,35 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <style>
+    :root {
+      --bg: #000;
+      --text: #999;
+      --heading: #fff;
+      --link: #666;
+      --link-hover: #fff;
+      --hint: #555;
+      --bar-bg: #222;
+      --bar-fill: #666;
+    }
+
+    .light {
+      --bg: #fff;
+      --text: #666;
+      --heading: #000;
+      --link: #666;
+      --link-hover: #000;
+      --hint: #999;
+      --bar-bg: #ddd;
+      --bar-fill: #999;
+    }
+
     *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
       overflow: hidden;
-      background: #000;
+      background: var(--bg);
       font-family: 'Space Mono', monospace;
-      color: #2a2a2e;
+      color: var(--text);
       cursor: crosshair;
     }
 
@@ -61,7 +83,7 @@
       transform: translateX(-50%);
       width: 120px;
       height: 3px;
-      background: #222;
+      background: var(--bar-bg);
       border-radius: 2px;
       overflow: hidden;
     }
@@ -69,7 +91,7 @@
     #loading-bar-fill {
       height: 100%;
       width: 0%;
-      background: #666;
+      background: var(--bar-fill);
       transition: width 0.2s ease-out;
     }
 
@@ -90,13 +112,13 @@
       font-family: 'Libre Baskerville', serif;
       font-weight: 700;
       letter-spacing: 0.02em;
-      color: #fff;
+      color: var(--heading);
     }
 
     .info .tagline {
       margin-top: 0.4rem;
       font-size: 0.7rem;
-      color: #999;
+      color: var(--text);
       letter-spacing: 0.04em;
     }
 
@@ -108,19 +130,19 @@
     }
 
     .info .links a {
-      color: #666;
+      color: var(--link);
       transition: color 0.3s;
     }
 
     .info .links a:hover {
-      color: #fff;
+      color: var(--link-hover);
     }
 
     .info .hint {
       margin-top: 0.8rem;
       font-size: 0.6rem;
       letter-spacing: 0.2em;
-      color: #555;
+      color: var(--hint);
       text-transform: uppercase;
     }
 
@@ -148,8 +170,28 @@
       }
     }
 
-  </style>
-  <script type="module" crossorigin src="/assets/index-C_UvT5NE.js"></script>
+    #power-button-overlay {
+      position: absolute;
+      left: 68%;
+      top: 62%;
+      width: 90px;
+      height: 90px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      cursor: pointer;
+      z-index: 25;
+      pointer-events: auto;
+      background: rgba(255, 255, 255, 0.02);
+      transition: background 0.2s ease;
+      border: 1px solid rgba(255,255,255,0.12);
+    }
+
+    #power-button-overlay:hover {
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255,255,255,0.3);
+    }
+  </style>
+  <script type="module" crossorigin src="/assets/index-C-QHWHEp.js"></script>
 </head>
 <body>
 
@@ -184,6 +226,6 @@
     </div>
     <p class="hint">[ click around ]</p>
   </div>
-
+  <!-- Removed visible power button overlay: theme now toggles on background taps -->
 </body>
 </html>

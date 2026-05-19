@@ -13,8 +13,7 @@ Personal landing page for Ralvye. A pixel art Millennium Falcon (Star Wars) rend
 ```
 main.js              # All 3D scene logic (single file)
 index.html           # HTML shell with overlay UI
-deploy.js            # Build + deploy script
-package.json         # Scripts: dev, build, ship
+package.json         # Scripts: dev, build
 public/              # Static assets (copied to dist by Vite)
   millennium-falcon.png        # Pixel art source image of the Millennium Falcon
   crt-draco.glb      # Draco-compressed CRT monitor model (74KB)
@@ -78,17 +77,7 @@ crt.glb                                 # Uncompressed GLB (890KB)
 ```bash
 pnpm dev          # Start Vite dev server
 pnpm build        # Build to dist/
-pnpm run ship     # Build + deploy to GitHub
 ```
-
-## Deploy Process (`pnpm run ship`)
-1. `vite build` outputs to `dist/`
-2. `deploy.js` runs:
-   - Removes old build artifacts from repo root (preserves .git, CNAME, robots.txt, etc.)
-   - Copies `dist/` contents to repo root
-   - `git add -A && git commit && git push`
-3. Cloudflare picks up the push and serves from repo root
-4. **Important**: deploy.js uses `git add -A` which stages everything in the working directory. The `sourceOnly` set in deploy.js prevents source files from being deleted but they still get committed. This needs improvement if source files shouldn't be in the deployed repo.
 
 ## Deployment Target
 - GitHub repo: `ralvye/ralvye.com` (branch: main)
@@ -100,5 +89,5 @@ pnpm run ship     # Build + deploy to GitHub
 - The Draco decoder path must match the Three.js version or the GLB won't load
 - `scene.background = null` means canvas is transparent - body background shows through
 - When voxels activate (physics), they must be moved from falconGroup to scene to avoid coordinate mismatch
-- `pnpm deploy` is a reserved pnpm command - use `pnpm run ship` instead
+- `pnpm deploy` is a reserved pnpm command (don't use it)
 - cannon-es uses `setFromAxisAngle` not `setFromEulerAngles`
