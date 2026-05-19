@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CV - Rodrigo Alvear Yévenes</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:wght@400;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      background: #fff;
+      color: #2a2a2e;
+      font-family: 'Space Mono', monospace;
+      line-height: 1.6;
+      padding: 2rem;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    header {
+      margin-bottom: 2rem;
+      padding-bottom: 1.5rem;
+      border-bottom: 2px solid #000;
+    }
+    h1 {
+      font-family: 'Libre Baskerville', serif;
+      font-size: 2.2rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 0.3rem;
+      color: #000;
+    }
+    .profile {
+      font-size: 0.95rem;
+      color: #666;
+      line-height: 1.5;
+      margin-top: 0.8rem;
+    }
+    .contact-info {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: #555;
+    }
+    .contact-info a {
+      color: #2a2a2e;
+      text-decoration: none;
+      border-bottom: 1px solid #ccc;
+      transition: color 0.3s;
+    }
+    .contact-info a:hover {
+      color: #000;
+      border-bottom-color: #000;
+    }
+    section {
+      margin-bottom: 2rem;
+    }
+    h2 {
+      font-family: 'Libre Baskerville', serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      margin-bottom: 0.8rem;
+      color: #000;
+      text-transform: uppercase;
+      border-left: 3px solid #2a2a2e;
+      padding-left: 0.8rem;
+    }
+    h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-top: 0.8rem;
+      margin-bottom: 0.2rem;
+      color: #000;
+    }
+    .job-title {
+      font-size: 0.85rem;
+      color: #666;
+      font-weight: 400;
+      margin-bottom: 0.3rem;
+    }
+    .job-description {
+      font-size: 0.85rem;
+      color: #555;
+      margin-bottom: 0.5rem;
+    }
+    .skills {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem;
+      font-size: 0.85rem;
+      color: #555;
+    }
+    .skill-item {
+      display: flex;
+      gap: 0.5rem;
+    }
+    .skill-item::before {
+      content: "▸";
+      color: #2a2a2e;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    ul {
+      list-style: none;
+      margin-left: 1rem;
+      font-size: 0.85rem;
+      color: #555;
+    }
+    li {
+      margin-bottom: 0.4rem;
+      display: flex;
+      gap: 0.5rem;
+    }
+    li::before {
+      content: "●";
+      color: #2a2a2e;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+    .education-item {
+      margin-bottom: 1rem;
+    }
+    .education-school {
+      font-weight: 700;
+      color: #000;
+      font-size: 0.9rem;
+    }
+    .education-degree {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 0.2rem;
+    }
+    .languages {
+      display: flex;
+      gap: 2rem;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+      color: #555;
+    }
+    .language {
+      display: flex;
+      flex-direction: column;
+    }
+    .language-name {
+      font-weight: 700;
+      color: #000;
+    }
+    footer {
+      margin-top: 3rem;
+      padding-top: 1.5rem;
+      border-top: 1px solid #ddd;
+      text-align: center;
+      font-size: 0.75rem;
+      color: #999;
+    }
+    a.back-link {
+      display: inline-block;
+      margin-bottom: 2rem;
+      font-size: 0.8rem;
+      color: #666;
+      text-decoration: none;
+      border-bottom: 1px solid #ccc;
+      transition: color 0.3s;
+    }
+    a.back-link:hover {
+      color: #000;
+      border-bottom-color: #000;
+    }
+    @media (max-width: 768px) {
+      body { padding: 1.5rem; }
+      h1 { font-size: 1.8rem; }
+      h2 { font-size: 1.1rem; }
+      .contact-info { flex-direction: column; gap: 0.8rem; }
+      .skills { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <a href="/" class="back-link">← Volver al sitio</a>
+    
+    <header>
+      <h1>Rodrigo Alvear Yévenes</h1>
+      <div class="profile">
+        <strong>Ingeniero DevOps Senior</strong> con experiencia en la automatización de procesos y la implementación de pipelines de CI/CD, optimizando el flujo de trabajo de desarrollo a producción utilizando herramientas como Jenkins y GitHub Actions. Mi enfoque proactivo en la adopción de prácticas DevOps ha facilitado la colaboración entre equipos y ha acelerado la entrega de software, mientras lidero iniciativas de transformación digital y adopto tecnologías avanzadas como Docker y Kubernetes para alcanzar metas estratégicas y fomentar la innovación continua.
+      </div>
+      <div class="contact-info">
+        <span>📞 <a href="tel:+56985964703">(+56) 985 964 703</a></span>
+        <span>✉️ <a href="mailto:ralvearye@gmail.com">ralvearye@gmail.com</a></span>
+        <span>📍 Avda. España #397, Santiago</span>
+      </div>
+    </header>
+
+    <section>
+      <h2>Dominio Tecnológico</h2>
+      <div class="skills">
+        <div class="skill-item">Metodologías Ágiles (Scrum, SFPC)</div>
+        <div class="skill-item">Git, Jenkins, Docker, Kubernetes</div>
+        <div class="skill-item">Linux, Jira, QA Técnico, CI/CD</div>
+        <div class="skill-item">Cloud AWS y Azure (nivel medio)</div>
+        <div class="skill-item">Control de versiones: GitHub, Bitbucket</div>
+        <div class="skill-item">Programación: Python, C#, Java, Groovy</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Formación</h2>
+      <div class="education-item">
+        <div class="education-school">Universidad Nacional Andrés Bello</div>
+        <div class="education-degree">2014 – 2018</div>
+        <div class="education-degree">Ingeniero en Computación e Informática</div>
+      </div>
+      <div class="education-item">
+        <div class="education-school">Universidad de Salamanca (España)</div>
+        <div class="education-degree">2022 – 2023</div>
+        <div class="education-degree">Magister en Transformación Digital</div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Antecedentes Laborales</h2>
+      
+      <h3>BCI — DevOps Ing Senior</h3>
+      <div class="job-title">2021 – Actualidad</div>
+      <div class="job-description">Implementación y optimización de pipelines de integración continua y despliegue continuo (CI/CD) para maximizar la eficiencia y la calidad del software.</div>
+      
+      <h3>VUNIC - BCI — DevOps Release Manager</h3>
+      <div class="job-title">2019 – 2021</div>
+      <div class="job-description">Responsable del ciclo de vida del release, administración de versiones, coordinación en pasos de producción, garantizando que los recursos, plazos y la calidad general del proceso se tengan en cuenta en todo momento.</div>
+      
+      <h3>SENTRA - BCI — DevOps Practitioner</h3>
+      <div class="job-title">2019</div>
+      <div class="job-description">Ambientación de componentes en ambientes pre productivos, soporte para nuevos cambios de versión, pruebas automáticas, QA técnico y soporte de herramienta para control de versión Bitbucket.</div>
+      
+      <h3>EVERIS — Desarrollador de Software</h3>
+      <div class="job-title">2019</div>
+      <div class="job-description">OUTSYSTEM / Desarrollo de aplicaciones completas con una única herramienta, para mejoras de la productividad y reducción de tiempo de entrega para cliente Entel.</div>
+      
+      <h3>CMA CGM — Desarrollador de Software</h3>
+      <div class="job-title">2018</div>
+      <div class="job-description">Práctica Profesional. Parte del equipo de desarrollo para levantar procesos de carga naviera, a través de metodologías ágiles (SCRUM).</div>
+      
+      <h3>Robotics Lab — Project Manager</h3>
+      <div class="job-title">2018</div>
+      <div class="job-description">Integración de Tecnologías mejoradas con ROS en Robots de servicio humanoide.</div>
+    </section>
+
+    <section>
+      <h2>Cursos y Certificaciones</h2>
+      <ul>
+        <li>DevOps Foundations</li>
+        <li>Scrum Foundation Professional</li>
+        <li>Gestión de Proyectos Lean</li>
+        <li>Jenkins Cloudbees</li>
+        <li>Azure Fundamentals AZ-900</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>Idiomas</h2>
+      <div class="languages">
+        <div class="language">
+          <span class="language-name">Español</span>
+          <span>Nativo</span>
+        </div>
+        <div class="language">
+          <span class="language-name">Inglés</span>
+          <span>Medio</span>
+        </div>
+        <div class="language">
+          <span class="language-name">Portugués</span>
+          <span>Básico</span>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>© 2026 Rodrigo Alvear Yévenes — Todos los derechos reservados</p>
+    </footer>
+  </div>
+</body>
+</html>
