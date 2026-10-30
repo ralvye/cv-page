@@ -1,6 +1,6 @@
 ====================================================
   ralvye.com - CV en 3D
-  Pagina personal estilo isla interactiva en Three.js
+  Pagina personal estilo pista de carreras interactiva en Three.js
 ====================================================
 
 
@@ -57,9 +57,9 @@ TECNOLOGIAS UTILIZADAS
 
 NOTAS TECNICAS
 --------------
-  - La escena es una isla procedural: el terreno, los arboles y el campo de
-    estrellas se generan en el navegador, sin modelos 3D externos.
-  - Cada estacion de la isla corresponde a una seccion del CV (content.js).
+  - La escena es una pista procedural sobre pasto: la pista, los bordillos y el
+    pasto se generan en el navegador, sin modelos 3D externos.
+  - Cada estacion de la pista corresponde a una seccion del CV (content.js).
   - Conduccion: flechas o WASD para manejar el auto; al pasar por un anillo se abre su seccion.
     En el celular se usan los botones tactiles de la pantalla.
   - Los botones de la barra inferior (flechas y puntos) saltan directo a cada seccion.

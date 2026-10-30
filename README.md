@@ -1,8 +1,8 @@
 # CV en 3D · ralvye
 
 Página personal de Rodrigo Alvear Yévenes con forma de juego de conducción:
-manejas un auto por una isla nocturna y, al pasar por cada anillo de colores,
-se abre una sección del CV.
+manejas un auto por una pista de carreras nocturna, con pasto a los costados,
+y al pasar por cada icono del suelo se abre una sección del CV.
 
 Demo local: abrir `web/index.html` con cualquier servidor estático (por ejemplo `npx serve web`).
 
@@ -53,9 +53,7 @@ Las redes sociales están en `socials` del mismo archivo.
 Este proyecto usa assets de [folio-2025](https://github.com/brunosimon/folio-2025)
 de Bruno Simon, bajo licencia MIT (ver `source/public/FOLIO-2025-LICENSE.md`):
 
-- `source/public/terrain/` (terreno y textura)
 - `source/public/vehicle/` (modelo del auto)
 - `source/public/favicons/` (íconos de la pestaña)
-- `source/public/palette.png`
 
 El código de la escena (`source/src/`) fue escrito para este proyecto, inspirado en el juego de Bruno.

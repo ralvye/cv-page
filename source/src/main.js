@@ -10,7 +10,7 @@ const TRACK_RX = 30;
 const TRACK_RZ = 24;
 const ROAD_HALF = 2.4;
 const ROAD_LIFT = 0.1;
-const WATER_Y = -0.55;
+const ARENA_HALF = 380;
 const STATION_RADIUS = 4;
 const SOCIAL_RADIUS = 3.5;
 const SOCIAL_ARC = 7;
@@ -18,11 +18,11 @@ const CAR_LENGTH = 3;
 const MAX_SPEED = 26;
 const MAX_REVERSE = 7;
 
-// Terreno de Bruno: malla de 129x129 vértices sobre ±96 unidades.
-const VERTS = 129;
-const HALF = 96;
-const CELL = (HALF * 2) / (VERTS - 1);
-let heights = null;
+// Ruedas: se llenan al armar el auto y se animan cada frame.
+let wheelRigs = [];
+let carFrontSign = 1;
+let steerDir = 0;
+let steerAngle = 0;
 
 const canvas = document.getElementById('scene');
 const card = document.getElementById('card');
@@ -126,71 +126,7 @@ function iconTexture(text, shape) {
   return tex;
 }
 
-// Colores del suelo como en Bruno: el canal azul elige el degradado (arena, agua turquesa, mar profundo)
-// y el canal verde mezcla el color de hierba. Se hornea una vez en una textura normal.
-const GRADIENT_STOPS = [
-  { t: 0.1, c: [0xff, 0xa9, 0x4e] },
-  { t: 0.3, c: [0x5b, 0xc2, 0xb9] },
-  { t: 0.9, c: [0x13, 0x37, 0x5f] },
-];
-const GRASS = [0xb8, 0xb6, 0x2e];
-
-function gradientAt(t) {
-  if (t <= GRADIENT_STOPS[0].t) return GRADIENT_STOPS[0].c;
-  const last = GRADIENT_STOPS[GRADIENT_STOPS.length - 1];
-  if (t >= last.t) return last.c;
-  for (let i = 0; i < GRADIENT_STOPS.length - 1; i++) {
-    const a = GRADIENT_STOPS[i];
-    const b = GRADIENT_STOPS[i + 1];
-    if (t <= b.t) {
-      const k = (t - a.t) / (b.t - a.t);
-      return a.c.map((v, j) => v + (b.c[j] - v) * k);
-    }
-  }
-  return last.c;
-}
-
-function bakeTerrainColors(src) {
-  const w = src.image.width;
-  const h = src.image.height;
-  const src2d = document.createElement('canvas');
-  src2d.width = w;
-  src2d.height = h;
-  const sg = src2d.getContext('2d', { willReadFrequently: true });
-  sg.drawImage(src.image, 0, 0);
-  const data = sg.getImageData(0, 0, w, h);
-  const px = data.data;
-  for (let i = 0; i < px.length; i += 4) {
-    const g = px[i + 1] / 255;
-    const base = gradientAt(1 - px[i + 2] / 255);
-    for (let j = 0; j < 3; j++) {
-      px[i + j] = base[j] + (GRASS[j] - base[j]) * g;
-    }
-    px[i + 3] = 255;
-  }
-  sg.putImageData(data, 0, 0);
-  const tex = new THREE.CanvasTexture(src2d);
-  tex.flipY = false;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  return tex;
-}
-
-// Altura del terreno: interpolación bilineal de la malla de Bruno.
-function heightAt(x, z) {
-  const fx = Math.min(VERTS - 1.001, Math.max(0, (x + HALF) / CELL));
-  const fz = Math.min(VERTS - 1.001, Math.max(0, (z + HALF) / CELL));
-  const ix = Math.floor(fx);
-  const iz = Math.floor(fz);
-  const tx = fx - ix;
-  const tz = fz - iz;
-  const i = iz * VERTS + ix;
-  const top = heights[i] * (1 - tx) + heights[i + 1] * tx;
-  const bottom = heights[i + VERTS] * (1 - tx) + heights[i + VERTS + 1] * tx;
-  return top * (1 - tz) + bottom * tz;
-}
-
-// Circuito cerrado sobre la isla; las estaciones se reparten a lo largo de él.
+// Circuito cerrado sobre el pasto; las estaciones se reparten a lo largo de él.
 const trackPoints = Array.from({ length: 16 }, (_, i) => {
   const t = (i / 16) * Math.PI * 2;
   return new THREE.Vector3(TRACK_RX * Math.cos(t), 0, TRACK_RZ * Math.sin(t));
@@ -204,33 +140,20 @@ const stationPos = stations.map((_, i) => {
   return { x: p.x, z: p.z, yaw: Math.atan2(t.x, t.z) };
 });
 
-// Mapa del suelo: el terreno real de Bruno, con su textura.
-function buildTerrain(gltf, texture) {
-  let geo = null;
-  gltf.scene.traverse((o) => {
-    if (!geo && o.isMesh) geo = o.geometry;
-  });
-  const pos = geo.attributes.position;
-  heights = new Float32Array(VERTS * VERTS);
-  for (let v = 0; v < pos.count; v++) {
-    const ix = Math.round((pos.getX(v) + HALF) / CELL);
-    const iz = Math.round((pos.getZ(v) + HALF) / CELL);
-    heights[iz * VERTS + ix] = pos.getY(v);
-  }
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: texture, roughness: 0.95 }));
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-
-  const water = new THREE.Mesh(
-    new THREE.CircleGeometry(400, 64).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0x0f2740, roughness: 0.25, metalness: 0.1 })
+// Pasto: plano grande que se funde con la niebla morada.
+function buildGround() {
+  const grassTex = noiseTexture('#4d8a2c', ['#33621c', '#6ca443', '#2c5418', '#8cbc52'], null);
+  grassTex.repeat.set(160, 160);
+  const grass = new THREE.Mesh(
+    new THREE.PlaneGeometry(ARENA_HALF * 2 + 40, ARENA_HALF * 2 + 40).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 })
   );
-  water.position.y = WATER_Y;
-  scene.add(water);
+  grass.receiveShadow = true;
+  scene.add(grass);
 }
 
-// Carretera: cinta de asfalto que sigue la altura del terreno.
-function buildRoad() {
+// Cinta plana que sigue la pista entre los desplazamientos a y b (perpendiculares al eje).
+function buildStrip(a, b, material, uRepeat = 1) {
   const SEG = 400;
   const pos = [];
   const uv = [];
@@ -244,15 +167,13 @@ function buildRoad() {
     if (prev) len += p.distanceTo(prev);
     prev = p;
     const l = Math.hypot(tan.x, tan.z);
-    const nx = (-tan.z / l) * ROAD_HALF;
-    const nz = (tan.x / l) * ROAD_HALF;
-    const yl = heightAt(p.x + nx, p.z + nz) + ROAD_LIFT;
-    const yr = heightAt(p.x - nx, p.z - nz) + ROAD_LIFT;
-    pos.push(p.x + nx, yl, p.z + nz, p.x - nx, yr, p.z - nz);
-    uv.push(0, len / 9, 1, len / 9);
+    const nx = -tan.z / l;
+    const nz = tan.x / l;
+    pos.push(p.x + nx * a, ROAD_LIFT, p.z + nz * a, p.x + nx * b, ROAD_LIFT, p.z + nz * b);
+    uv.push(0, len / 9, uRepeat, len / 9);
     if (i < SEG) {
-      const a = i * 2;
-      index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+      const k = i * 2;
+      index.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
     }
   }
   const geo = new THREE.BufferGeometry();
@@ -260,15 +181,41 @@ function buildRoad() {
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(index);
   geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(
-    geo,
-    new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide })
-  );
+  const mesh = new THREE.Mesh(geo, material);
   mesh.receiveShadow = true;
   scene.add(mesh);
 }
 
-// Marcadores del suelo (se crean cuando el terreno ya está cargado, porque usan su altura).
+// Bordillos rojos y blancos a ambos lados del asfalto.
+const kerbTex = (() => {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#d62b2b';
+  g.fillRect(0, 0, 32, 64);
+  g.fillStyle = '#f2f2f2';
+  g.fillRect(32, 0, 32, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+})();
+
+function buildTrack() {
+  buildGround();
+  const kerbMat = new THREE.MeshStandardMaterial({ map: kerbTex, roughness: 0.7, side: THREE.DoubleSide });
+  const asphaltMat = new THREE.MeshStandardMaterial({
+    map: asphaltTex,
+    roughness: 0.85,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+  });
+  buildStrip(-ROAD_HALF, ROAD_HALF, asphaltMat);
+  buildStrip(ROAD_HALF, ROAD_HALF + 0.9, kerbMat, 4);
+  buildStrip(-ROAD_HALF - 0.9, -ROAD_HALF, kerbMat, 4);
+}
+
+// Marcadores del suelo.
 let stationDiscs = [];
 let socialItems = [];
 
@@ -280,7 +227,7 @@ function buildMarkers() {
       new THREE.CircleGeometry(1.5, 48).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ map: iconTexture(String(i + 1), 'disc'), transparent: true, depthWrite: false })
     );
-    mesh.position.set(x, heightAt(x, z) + 0.12, z);
+    mesh.position.set(x, 0.12, z);
     scene.add(mesh);
     return mesh;
   });
@@ -294,7 +241,7 @@ function buildMarkers() {
       new THREE.PlaneGeometry(3.4, 1.7).rotateX(-Math.PI / 2),
       new THREE.MeshBasicMaterial({ map: iconTexture(s.label, 'pill'), transparent: true, depthWrite: false })
     );
-    mesh.position.set(x, heightAt(x, z) + 0.12, z);
+    mesh.position.set(x, 0.12, z);
     scene.add(mesh);
     return { ...s, x, z, mesh };
   });
@@ -313,6 +260,7 @@ function setupCar(gltf) {
 
   // El GLB trae una sola rueda: se copia a las cuatro esquinas.
   const wheel = model.getObjectByName('wheelContainer001');
+  const corners = wheel ? [wheel] : [];
   if (wheel) {
     const { x, y, z } = wheel.position;
     const ax = Math.abs(x);
@@ -322,6 +270,7 @@ function setupCar(gltf) {
       w.position.set(sx * ax, y, sz * az);
       if (sx < 0) w.rotation.y = Math.PI;
       model.add(w);
+      corners.push(w);
     }
   }
   carPivot.add(model);
@@ -338,7 +287,33 @@ function setupCar(gltf) {
   // Los faros van delante de las luces traseras: eso define el sentido de marcha.
   const back = new THREE.Box3().setFromObject(model.getObjectByName('backLights')).getCenter(new THREE.Vector3());
   const front = new THREE.Box3().setFromObject(model.getObjectByName('headlights001')).getCenter(new THREE.Vector3());
-  carYawOffset = front.x > back.x ? -Math.PI / 2 : Math.PI / 2;
+  carFrontSign = front.x > back.x ? 1 : -1;
+  carYawOffset = carFrontSign > 0 ? -Math.PI / 2 : Math.PI / 2;
+
+  // Cada rueda: su base de orientación, el cilindro que rueda y si es delantera.
+  wheelRigs = corners.map((node) => {
+    let cyl = null;
+    node.traverse((o) => {
+      if (!cyl && o.name.startsWith('wheelCylinder')) cyl = o;
+    });
+    const radius = cyl ? new THREE.Box3().setFromObject(cyl).getSize(new THREE.Vector3()).y / 2 : 0;
+    return {
+      node,
+      base: node.rotation.y,
+      cyl,
+      radius: radius || 0.3,
+      front: Math.sign(node.position.x) === carFrontSign,
+    };
+  });
+}
+
+// Ruedas: las delanteras giran al doblar y todas ruedan según la velocidad.
+function animateWheels(dt) {
+  steerAngle += (-steerDir * 0.5 - steerAngle) * Math.min(1, dt * 10);
+  for (const r of wheelRigs) {
+    if (r.front) r.node.rotation.y = r.base + steerAngle;
+    if (r.cyl) r.cyl.rotation.z -= (Math.cos(r.base) * carFrontSign * car.speed * dt) / r.radius;
+  }
 }
 
 const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0 };
@@ -402,18 +377,18 @@ function drive(dt) {
 
   const grip = Math.min(1, Math.abs(car.speed) / 8);
   const steer = (right ? 1 : 0) - (left ? 1 : 0);
-  if (steer) car.yaw += steer * 2.2 * grip * Math.sign(car.speed) * dt;
+  steerDir = steer;
+  if (steer) car.yaw -= steer * 2.2 * grip * Math.sign(car.speed) * dt;
 
   const nx = car.x + Math.sin(car.yaw) * car.speed * dt;
   const nz = car.z + Math.cos(car.yaw) * car.speed * dt;
-  // El agua bloquea el paso: el auto rebota.
-  if (heightAt(nx, nz) < WATER_Y + 0.1) {
-    car.speed *= -0.3;
+  // El borde del pasto frena el auto.
+  if (Math.abs(nx) > ARENA_HALF || Math.abs(nz) > ARENA_HALF) {
+    car.speed = 0;
   } else {
     car.x = nx;
     car.z = nz;
   }
-  car.y = heightAt(car.x, car.z);
 }
 
 function checkStations() {
@@ -461,7 +436,7 @@ function updateSocials() {
   }
   setActiveSocial(near);
   if (near) {
-    _v.set(near.x, heightAt(near.x, near.z) + 1.8, near.z).project(camera);
+    _v.set(near.x, 1.8, near.z).project(camera);
     const px = ((_v.x + 1) / 2) * window.innerWidth;
     const py = ((1 - _v.y) / 2) * window.innerHeight;
     socialEl.style.transform = `translate(${px}px, ${py}px)`;
@@ -562,7 +537,7 @@ function teleport(i) {
   car.z = s.z;
   car.yaw = s.yaw;
   car.speed = 0;
-  car.y = heightAt(car.x, car.z);
+  car.y = 0;
   if (next !== index) setIndex(next);
 }
 
@@ -631,7 +606,7 @@ window.addEventListener('keydown', (e) => {
 // Anillo de luz alrededor del punto de inicio, visible hasta empezar.
 function buildStartRing() {
   const s = stationPos[0];
-  const y = heightAt(s.x, s.z) + 0.12;
+  const y = 0.12;
   const mat = (opacity) =>
     new THREE.MeshBasicMaterial({ color: 0xb48cff, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide });
   startRings = [
@@ -652,6 +627,7 @@ function frame(now) {
   elapsed += dt;
 
   drive(dt);
+  animateWheels(dt);
   if (started) {
     checkStations();
     updateSocials();
@@ -674,18 +650,8 @@ function frame(now) {
 
 // Carga de assets de Bruno (MIT, ver FOLIO-2025-LICENSE.md) y arranque del juego.
 const loader = new GLTFLoader();
-const textureLoader = new THREE.TextureLoader();
-Promise.all([
-  loader.loadAsync(`${ASSETS}terrain/terrain.glb`),
-  textureLoader.loadAsync(`${ASSETS}terrain/terrain.png`),
-  loader.loadAsync(`${ASSETS}vehicle/default.glb`),
-]).then(([terrainGltf, terrainTex, carGltf]) => {
-  terrainTex.flipY = false;
-  terrainTex.colorSpace = THREE.SRGBColorSpace;
-  terrainTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-
-  buildTerrain(terrainGltf, bakeTerrainColors(terrainTex));
-  buildRoad();
+loader.loadAsync(`${ASSETS}vehicle/default.glb`).then((carGltf) => {
+  buildTrack();
   buildMarkers();
   buildStartRing();
   setupCar(carGltf);
