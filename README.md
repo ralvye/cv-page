@@ -53,7 +53,10 @@ Las redes sociales están en `socials` del mismo archivo.
 Este proyecto usa assets de [folio-2025](https://github.com/brunosimon/folio-2025)
 de Bruno Simon, bajo licencia MIT (ver `source/public/FOLIO-2025-LICENSE.md`):
 
-- `source/public/vehicle/` (modelo del auto)
 - `source/public/favicons/` (íconos de la pestaña)
+
+El modelo del auto y sus matcaps (`source/public/vehicle/2019/` y
+`source/public/vehicle/matcaps/`) provienen de [folio-2019](https://github.com/brunosimon/folio-2019)
+de Bruno Simon, también bajo licencia MIT.
 
 El código de la escena (`source/src/`) fue escrito para este proyecto, inspirado en el juego de Bruno.

@@ -20,7 +20,6 @@ const MAX_REVERSE = 7;
 
 // Ruedas: se llenan al armar el auto y se animan cada frame.
 let wheelRigs = [];
-let carFrontSign = 1;
 let steerDir = 0;
 let steerAngle = 0;
 
@@ -207,72 +206,82 @@ function buildMarkers() {
   });
 }
 
-// Auto: modelo de Bruno, centrado, con el frente en +X y ajustado al suelo.
+// Auto: piezas del juego 2019 de Bruno (MIT, ver README). Vienen con Z hacia arriba y el frente en +X;
+// se giran para que el frente quede en +Z, que es el sentido de marcha de carPivot.
 const carPivot = new THREE.Group();
 scene.add(carPivot);
-let carYawOffset = 0;
 
-function setupCar(gltf) {
-  const model = gltf.scene;
-  model.traverse((o) => {
-    if (o.isMesh) o.castShadow = true;
-  });
-
-  // El GLB trae una sola rueda: se copia a las cuatro esquinas.
-  const wheel = model.getObjectByName('wheelContainer001');
-  const corners = wheel ? [wheel] : [];
-  if (wheel) {
-    const { x, y, z } = wheel.position;
-    const ax = Math.abs(x);
-    const az = Math.abs(z);
-    for (const [sx, sz] of [[1, 1], [-1, 1], [-1, -1]]) {
-      const w = wheel.clone();
-      w.position.set(sx * ax, y, sz * az);
-      if (sx < 0) w.rotation.y = Math.PI;
-      model.add(w);
-      corners.push(w);
-    }
+// Color de matcap según el nombre de la pieza (o de su nodo padre); lo no reconocido es gris.
+function matcapColor(obj) {
+  for (let o = obj; o; o = o.parent) {
+    const n = o.name;
+    if (n.startsWith('shadeBlack')) return 'black';
+    if (n.startsWith('shadeWhite')) return 'white';
+    if (n.startsWith('shadeRed') || n.startsWith('pureRed')) return 'red';
+    if (n.startsWith('pureYellow')) return 'yellow';
   }
-  carPivot.add(model);
+  return 'gray';
+}
 
-  model.updateMatrixWorld(true);
-  let box = new THREE.Box3().setFromObject(model);
-  model.scale.multiplyScalar(CAR_LENGTH / box.getSize(new THREE.Vector3()).x);
-  model.updateMatrixWorld(true);
-  box = new THREE.Box3().setFromObject(model);
-  const c = box.getCenter(new THREE.Vector3());
-  model.position.set(-c.x, -box.min.y, -c.z);
-  model.updateMatrixWorld(true);
+function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
+  const parts = new THREE.Group();
+  const up = new THREE.Group();
+  up.rotation.x = -Math.PI / 2;
+  const pose = new THREE.Group();
+  pose.rotation.y = -Math.PI / 2;
+  pose.add(up);
+  up.add(parts);
 
-  // Los faros van delante de las luces traseras: eso define el sentido de marcha.
-  const back = new THREE.Box3().setFromObject(model.getObjectByName('backLights')).getCenter(new THREE.Vector3());
-  const front = new THREE.Box3().setFromObject(model.getObjectByName('headlights001')).getCenter(new THREE.Vector3());
-  carFrontSign = front.x > back.x ? 1 : -1;
-  carYawOffset = carFrontSign > 0 ? -Math.PI / 2 : Math.PI / 2;
+  for (const g of [chassis, antena, brake, reverse]) parts.add(g.scene);
 
-  // Cada rueda: su base de orientación, el cilindro que rueda y si es delantera.
-  wheelRigs = corners.map((node) => {
-    let cyl = null;
-    node.traverse((o) => {
-      if (!cyl && o.name.startsWith('wheelCylinder')) cyl = o;
-    });
-    const radius = cyl ? new THREE.Box3().setFromObject(cyl).getSize(new THREE.Vector3()).y / 2 : 0;
-    return {
-      node,
-      base: node.rotation.y,
-      cyl,
-      radius: radius || 0.3,
-      front: Math.sign(node.position.x) === carFrontSign,
-    };
+  // Una sola rueda en el archivo: se clona en las cuatro esquinas. Cada una gira
+  // en dos niveles: el de dirección (eje vertical, solo delanteras) y el de rodado (eje de la rueda).
+  const wheelBox = new THREE.Box3().setFromObject(wheel.scene);
+  const wc = wheelBox.getCenter(new THREE.Vector3());
+  const wheelR = wheelBox.getSize(new THREE.Vector3()).x / 2;
+  const wheels = [];
+  for (const [sx, sy, front] of [[1, 1, true], [1, -1, true], [-1, 1, false], [-1, -1, false]]) {
+    const steer = new THREE.Group();
+    steer.position.set(sx * wc.x, sy * wc.y, wc.z);
+    const spin = new THREE.Group();
+    const mirror = new THREE.Group();
+    mirror.scale.y = sy;
+    const holder = wheel.scene.clone(true);
+    holder.position.copy(wc).negate();
+    mirror.add(holder);
+    spin.add(mirror);
+    steer.add(spin);
+    parts.add(steer);
+    wheels.push({ steer: front ? steer : null, spin, radius: wheelR });
+  }
+
+  const mats = {};
+  parts.traverse((o) => {
+    if (!o.isMesh) return;
+    const c = matcapColor(o);
+    mats[c] ??= new THREE.MeshMatcapMaterial({ matcap: matcaps[c] });
+    o.material = mats[c];
+    o.castShadow = true;
   });
+
+  // Escala por largo, luego centrado en X/Z y apoyado en el suelo.
+  let box = new THREE.Box3().setFromObject(pose);
+  const s = CAR_LENGTH / box.getSize(new THREE.Vector3()).z;
+  parts.scale.setScalar(s);
+  box = new THREE.Box3().setFromObject(pose);
+  const c = box.getCenter(new THREE.Vector3());
+  pose.position.set(-c.x, -box.min.y, -c.z);
+  carPivot.add(pose);
+
+  wheelRigs = wheels.map((w) => ({ ...w, radius: w.radius * s }));
 }
 
 // Ruedas: las delanteras giran al doblar y todas ruedan según la velocidad.
 function animateWheels(dt) {
   steerAngle += (-steerDir * 0.5 - steerAngle) * Math.min(1, dt * 10);
   for (const r of wheelRigs) {
-    if (r.front) r.node.rotation.y = r.base + steerAngle;
-    if (r.cyl) r.cyl.rotation.z -= (Math.cos(r.base) * carFrontSign * car.speed * dt) / r.radius;
+    if (r.steer) r.steer.rotation.z = steerAngle;
+    r.spin.rotation.y += (car.speed * dt) / r.radius;
   }
 }
 
@@ -483,10 +492,25 @@ function updateDots() {
   dots.forEach((d, i) => d.classList.toggle('active', i === index));
 }
 
+// Progreso: cada sección visitada cambia de color y actualiza el contador.
+const visited = new Set();
+const progressEl = document.getElementById('progress');
+
+function updateProgress() {
+  const done = visited.size === N;
+  progressEl.textContent = done
+    ? '¡Pista completada! Revisa las redes abajo'
+    : `Secciones: ${visited.size}/${N}`;
+  progressEl.classList.toggle('done', done);
+  stationDiscs.forEach((d, i) => d.material.color.set(visited.has(i) ? 0x7fd67f : 0xffffff));
+}
+
 function setIndex(i, instant = false) {
   index = i;
+  visited.add(i);
   renderCard(i, instant);
   updateDots();
+  updateProgress();
 }
 
 // Lleva el auto a una estación (botones y puntos).
@@ -597,7 +621,7 @@ function frame(now) {
   }
 
   carPivot.position.set(car.x, car.y, car.z);
-  carPivot.rotation.y = car.yaw + carYawOffset;
+  carPivot.rotation.y = car.yaw;
   moon.position.set(car.x - 40, 80, car.z - 30);
   moon.target.position.set(car.x, 0, car.z);
   updateCamera(dt);
@@ -608,16 +632,32 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-// Carga de assets de Bruno (MIT, ver FOLIO-2025-LICENSE.md) y arranque del juego.
+// Carga de assets de Bruno (MIT, ver FOLIO-2025-LICENSE.md y README) y arranque del juego.
 const loader = new GLTFLoader();
-loader.loadAsync(`${ASSETS}vehicle/default.glb`).then((carGltf) => {
+const texLoader = new THREE.TextureLoader();
+const CAR_DIR = `${ASSETS}vehicle/2019/`;
+const MATCAP_DIR = `${ASSETS}vehicle/matcaps/`;
+const MATCAP_NAMES = ['black', 'white', 'red', 'yellow', 'gray'];
+const CAR_PARTS = ['chassis', 'antena', 'backLightsBrake', 'backLightsReverse', 'wheel'];
+
+Promise.all([
+  Promise.all(CAR_PARTS.map((p) => loader.loadAsync(`${CAR_DIR}${p}.glb`))),
+  Promise.all(MATCAP_NAMES.map((m) => texLoader.loadAsync(`${MATCAP_DIR}${m}.png`))),
+]).then(([[chassis, antena, brake, reverse, wheel], maps]) => {
+  const matcaps = {};
+  MATCAP_NAMES.forEach((name, i) => {
+    maps[i].colorSpace = THREE.SRGBColorSpace;
+    matcaps[name] = maps[i];
+  });
+
   buildTrack();
   buildMarkers();
   buildStartRing();
-  setupCar(carGltf);
+  setupCar({ chassis, antena, brake, reverse, wheel }, matcaps);
 
   resize();
   teleport(0);
   setIndex(0, true);
   requestAnimationFrame(frame);
 });
+
