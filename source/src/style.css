@@ -1,7 +1,10 @@
 :root {
-  --ink: #111;
-  --paper: #fff;
-  --accent: #ffd166;
+  --bg: #0b0f18;
+  --panel: #131927;
+  --line: #2a3347;
+  --text: #e8ecf5;
+  --muted: #98a2b8;
+  --accent: #22d3ee;
 }
 
 * {
@@ -13,8 +16,8 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  background: #9fd8ef;
-  color: var(--ink);
+  background: var(--bg);
+  color: var(--text);
   font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
 
@@ -36,8 +39,9 @@ body {
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.9);
-  border: 2px solid var(--ink);
+  color: var(--text);
+  background: rgba(19, 25, 39, 0.85);
+  border: 1px solid var(--line);
   border-radius: 999px;
   white-space: nowrap;
 }
@@ -49,11 +53,11 @@ body {
   width: min(440px, 44vw);
   max-height: 72vh;
   overflow: auto;
-  padding: 28px 30px;
-  background: var(--paper);
-  border: 3px solid var(--ink);
-  border-radius: 22px;
-  box-shadow: 8px 8px 0 var(--ink);
+  padding: 26px 28px;
+  background: rgba(19, 25, 39, 0.94);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
   opacity: 0;
   transform: translateY(-50%) translateX(20px);
   transition: opacity 0.35s, transform 0.35s;
@@ -68,6 +72,7 @@ body {
   margin: 4px 0 0;
   font-size: 14px;
   line-height: 1.5;
+  color: var(--muted);
 }
 
 #card .eyebrow {
@@ -76,30 +81,33 @@ body {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: #555;
+  color: var(--accent);
 }
 
 #card h1 {
   margin: 0 0 6px;
   font-size: clamp(24px, 3vw, 34px);
-  font-weight: 900;
+  font-weight: 800;
   line-height: 1.1;
+  color: var(--text);
 }
 
 #card .lead {
   margin-top: 8px;
   font-size: 15px;
   line-height: 1.55;
+  color: var(--text);
 }
 
 #card h2 {
   margin: 0 0 2px;
   font-size: 17px;
+  color: var(--text);
 }
 
 .job {
   padding: 12px 0;
-  border-top: 2px solid var(--ink);
+  border-top: 1px solid var(--line);
 }
 
 .meta {
@@ -107,7 +115,7 @@ body {
   margin-bottom: 4px;
   font-size: 13px;
   font-weight: 700;
-  color: #444;
+  color: var(--accent);
 }
 
 .list {
@@ -115,6 +123,7 @@ body {
   padding-left: 18px;
   font-size: 15px;
   line-height: 1.7;
+  color: var(--text);
 }
 
 .links {
@@ -126,16 +135,15 @@ body {
 
 .links a {
   padding: 6px 12px;
-  color: var(--ink);
+  color: var(--bg);
   font-weight: 700;
   text-decoration: none;
   background: var(--accent);
-  border: 2px solid var(--ink);
   border-radius: 999px;
 }
 
 .links a:hover {
-  transform: translateY(-1px);
+  filter: brightness(1.15);
 }
 
 .nav {
@@ -147,25 +155,25 @@ body {
   align-items: center;
   gap: 12px;
   padding: 8px 14px;
-  background: var(--paper);
-  border: 3px solid var(--ink);
+  background: rgba(19, 25, 39, 0.92);
+  border: 1px solid var(--line);
   border-radius: 999px;
-  box-shadow: 4px 4px 0 var(--ink);
 }
 
 .nav button {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   font-size: 18px;
-  font-weight: 900;
-  background: var(--paper);
-  border: 2px solid var(--ink);
+  font-weight: 700;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--line);
   border-radius: 50%;
   cursor: pointer;
 }
 
 .nav button:hover {
-  background: var(--accent);
+  border-color: var(--accent);
 }
 
 #dots {
@@ -178,24 +186,58 @@ body {
   height: 12px;
   padding: 0;
   background: transparent;
-  border: 2px solid var(--ink);
+  border: 2px solid var(--muted);
   border-radius: 50%;
   cursor: pointer;
 }
 
 .dot.active {
-  background: var(--ink);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.pad {
+  position: fixed;
+  bottom: 22px;
+  display: flex;
+  gap: 8px;
+}
+
+.pad.left {
+  left: 16px;
+}
+
+.pad.right {
+  right: 16px;
+}
+
+.pad button {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+  color: var(--text);
+  background: rgba(19, 25, 39, 0.92);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  touch-action: none;
+  user-select: none;
+  cursor: pointer;
+}
+
+.pad button:active {
+  background: var(--accent);
+  color: var(--bg);
 }
 
 @media (max-width: 760px) {
   #card {
     top: auto;
     right: 12px;
-    bottom: 90px;
+    bottom: 96px;
     left: 12px;
     width: auto;
-    max-height: 46vh;
-    padding: 20px;
+    max-height: 40vh;
+    padding: 18px;
     transform: translateY(20px);
   }
 
@@ -205,5 +247,14 @@ body {
 
   .hint {
     font-size: 12px;
+  }
+
+  #dots {
+    display: none;
+  }
+
+  .pad button {
+    width: 46px;
+    height: 46px;
   }
 }

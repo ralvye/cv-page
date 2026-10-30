@@ -4,7 +4,7 @@ export const stations = [
     title: 'Rodrigo Alvear Yévenes',
     lead: 'Ingeniero DevOps Senior',
     blocks: [
-      { text: 'Cada isla de la escena es una sección de mi CV. Recórrela con la rueda, las flechas o deslizando.' },
+      { text: 'Maneja el auto con ↑ ↓ ← → (o W A S D) y pasa por los anillos de colores para abrir cada sección.' },
     ],
   },
   {

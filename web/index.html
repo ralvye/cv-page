@@ -6,17 +6,25 @@
     <title>Rodrigo Alvear Yévenes · Ingeniero DevOps Senior</title>
     <meta name="description" content="CV de Rodrigo Alvear Yévenes, Ingeniero DevOps Senior." />
     <link rel="icon" href="/images/apple-touch-icon.png" />
-    <script type="module" crossorigin src="/assets/index-DfInxbfA.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-B-SnFtdW.css">
+    <script type="module" crossorigin src="/assets/index-BpsCti_X.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-C66Go6yn.css">
   </head>
   <body>
     <canvas id="scene"></canvas>
-    <p class="hint">Rueda, flechas o desliza para explorar</p>
+    <p class="hint">Conduce con ↑ ↓ ← → o W A S D · pasa por los anillos para ver cada sección</p>
     <main id="card" aria-live="polite"></main>
     <nav class="nav" aria-label="Secciones">
       <button id="prev" aria-label="Sección anterior">←</button>
       <div id="dots"></div>
       <button id="next" aria-label="Sección siguiente">→</button>
     </nav>
+    <div class="pad left" aria-label="Dirección">
+      <button data-act="left" aria-label="Girar a la izquierda">◀</button>
+      <button data-act="right" aria-label="Girar a la derecha">▶</button>
+    </div>
+    <div class="pad right" aria-label="Pedales">
+      <button data-act="brake" aria-label="Frenar o retroceder">▼</button>
+      <button data-act="gas" aria-label="Acelerar">▲</button>
+    </div>
   </body>
 </html>
