@@ -2,21 +2,28 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { stations, socials } from './content.js';
+import {
+  ARENA_HALF,
+  createTrack,
+  poseAt,
+  buildTrack,
+  buildScenery,
+  heightAt,
+  createDebris,
+  collideCar,
+} from './world.js';
 import './style.css';
 
 const N = stations.length;
 const ASSETS = import.meta.env.BASE_URL;
-const TRACK_RX = 30;
-const TRACK_RZ = 24;
-const ROAD_HALF = 2.4;
-const ROAD_LIFT = 0.1;
-const ARENA_HALF = 380;
-const STATION_RADIUS = 4;
 const SOCIAL_RADIUS = 3.5;
 const SOCIAL_ARC = 7;
 const CAR_LENGTH = 3;
 const MAX_SPEED = 26;
 const MAX_REVERSE = 7;
+const GRAVITY = 30;
+const APPROACH = 12;
+const STATION_COLOR = 0xe07b22;
 
 // Ruedas: se llenan al armar el auto y se animan cada frame.
 let wheelRigs = [];
@@ -85,98 +92,20 @@ function iconTexture(text, shape) {
   return tex;
 }
 
-// Circuito cerrado sobre el pasto; las estaciones se reparten a lo largo de él.
-const trackPoints = Array.from({ length: 16 }, (_, i) => {
-  const t = (i / 16) * Math.PI * 2;
-  return new THREE.Vector3(TRACK_RX * Math.cos(t), 0, TRACK_RZ * Math.sin(t));
-});
-const curve = new THREE.CatmullRomCurve3(trackPoints, true, 'centripetal');
-
-const stationPos = stations.map((_, i) => {
-  const u = i / N;
-  const p = curve.getPointAt(u);
-  const t = curve.getTangentAt(u);
-  return { x: p.x, z: p.z, yaw: Math.atan2(t.x, t.z) };
-});
-
-// Pasto: plano grande que se funde con la niebla morada.
-function buildGround() {
-  const grass = new THREE.Mesh(
-    new THREE.PlaneGeometry(ARENA_HALF * 2 + 40, ARENA_HALF * 2 + 40).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0x5f9e3c, roughness: 1 })
-  );
-  grass.receiveShadow = true;
-  scene.add(grass);
-}
-
-// Cinta plana que sigue la pista entre los desplazamientos a y b (perpendiculares al eje).
-function buildStrip(a, b, material, uRepeat = 1, lift = ROAD_LIFT) {
-  const SEG = 400;
-  const pos = [];
-  const uv = [];
-  const index = [];
-  let len = 0;
-  let prev = null;
-  for (let i = 0; i <= SEG; i++) {
-    const t = i / SEG;
-    const p = curve.getPointAt(t);
-    const tan = curve.getTangentAt(t);
-    if (prev) len += p.distanceTo(prev);
-    prev = p;
-    const l = Math.hypot(tan.x, tan.z);
-    const nx = -tan.z / l;
-    const nz = tan.x / l;
-    pos.push(p.x + nx * a, lift, p.z + nz * a, p.x + nx * b, lift, p.z + nz * b);
-    uv.push(0, len / 9, uRepeat, len / 9);
-    if (i < SEG) {
-      const k = i * 2;
-      index.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
-    }
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geo.setIndex(index);
-  geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, material);
-  mesh.receiveShadow = true;
-  scene.add(mesh);
-}
-
-// Bordillos rojos y blancos a ambos lados del asfalto.
-const kerbTex = (() => {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d');
-  g.fillStyle = '#d62b2b';
-  g.fillRect(0, 0, 32, 64);
-  g.fillStyle = '#f2f2f2';
-  g.fillRect(32, 0, 32, 64);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-})();
-
-function buildTrack() {
-  buildGround();
-  const kerbMat = new THREE.MeshStandardMaterial({ map: kerbTex, roughness: 0.7, side: THREE.DoubleSide });
-  const asphaltMat = new THREE.MeshStandardMaterial({
-    color: 0x4a4d55,
-    roughness: 0.9,
-    side: THREE.DoubleSide,
-  });
-  const lineMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.8, side: THREE.DoubleSide });
-  buildStrip(-ROAD_HALF, ROAD_HALF, asphaltMat);
-  buildStrip(ROAD_HALF - 0.6, ROAD_HALF, lineMat, 1, ROAD_LIFT + 0.04);
-  buildStrip(-ROAD_HALF, -ROAD_HALF + 0.6, lineMat, 1, ROAD_LIFT + 0.04);
-  buildStrip(ROAD_HALF, ROAD_HALF + 0.9, kerbMat, 4);
-  buildStrip(-ROAD_HALF - 0.9, -ROAD_HALF, kerbMat, 4);
-}
+// Pista lineal (ver world.js). La estación 0 es el inicio; las demás son cajas sobre la pista.
+const curve = createTrack();
+const TRACK_LEN = curve.getLength();
+const STATION_U = stations.map((_, i) => (i === 0 ? 0 : 0.12 + (i - 1) * 0.14));
+const stationPos = STATION_U.map((u) => poseAt(curve, u));
+const approachPos = STATION_U.map((u) => poseAt(curve, Math.max(0, u - APPROACH / TRACK_LEN)));
 
 // Marcadores del suelo.
 let stationDiscs = [];
 let socialItems = [];
+// Obstáculos (sólidos o rompibles) y partículas al romperse.
+let obstacles = [];
+let ramps = [];
+let debris = null;
 
 function buildMarkers() {
   // Estaciones: icono plano en el suelo; al pasar encima se abre su sección.
@@ -203,6 +132,30 @@ function buildMarkers() {
     mesh.position.set(x, 0.12, z);
     scene.add(mesh);
     return { ...s, x, z, mesh };
+  });
+}
+
+// Cajas naranjas sobre la pista: cada una lleva el número de la sección y se rompe al pasar.
+function buildStationCrates() {
+  const geo = new THREE.BoxGeometry(2, 2, 2);
+  const mat = new THREE.MeshStandardMaterial({ color: STATION_COLOR, roughness: 0.8 });
+  const signGeo = new THREE.PlaneGeometry(1.5, 1.5).rotateX(-Math.PI / 2);
+  stations.forEach((_, i) => {
+    if (i === 0) return;
+    const { x, z } = stationPos[i];
+    const g = new THREE.Group();
+    g.position.set(x, 1, z);
+    const box = new THREE.Mesh(geo, mat);
+    box.castShadow = true;
+    g.add(box);
+    const sign = new THREE.Mesh(
+      signGeo,
+      new THREE.MeshBasicMaterial({ map: iconTexture(String(i + 1), 'disc'), transparent: true, depthWrite: false })
+    );
+    sign.position.y = 1.01;
+    g.add(sign);
+    scene.add(g);
+    obstacles.push({ x, z, r: 1.2, solid: false, drag: 0.6, group: g, kind: 'station', index: i, color: STATION_COLOR });
   });
 }
 
@@ -285,7 +238,7 @@ function animateWheels(dt) {
   }
 }
 
-const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0 };
+const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0, vy: 0, groundY: 0 };
 
 // Controles: teclado (flechas o WASD) y botones táctiles.
 const KEY_ACTIONS = {
@@ -360,16 +313,27 @@ function drive(dt) {
   }
 }
 
-function checkStations() {
-  for (let i = 0; i < N; i++) {
-    if (i === index) continue;
-    const dx = car.x - stationPos[i].x;
-    const dz = car.z - stationPos[i].z;
-    if (dx * dx + dz * dz < STATION_RADIUS * STATION_RADIUS) {
-      setIndex(i);
-      break;
+// Altura del auto: sigue las rampas y, al bajar de una, sale volando con la velocidad de subida.
+function updateVertical(dt) {
+  const ground = heightAt(ramps, car.x, car.z);
+  const rise = ground - car.groundY;
+  if (car.y <= car.groundY + 0.05 && rise >= 0) {
+    car.vy = rise / dt;
+    car.y = ground;
+  } else {
+    car.vy -= GRAVITY * dt;
+    car.y += car.vy * dt;
+    if (car.y <= ground) {
+      car.y = ground;
+      car.vy = 0;
     }
   }
+  car.groundY = ground;
+}
+
+// Choque con árboles, llantas, arbustos y cajas (ver world.js).
+function onStationBreak(i) {
+  if (i !== index) setIndex(i);
 }
 
 // Redes sociales: al estar cerca aparece la etiqueta con el botón para abrirlas.
@@ -513,15 +477,18 @@ function setIndex(i, instant = false) {
   updateProgress();
 }
 
-// Lleva el auto a una estación (botones y puntos).
+// Lleva el auto a una sección (botones y puntos), unos metros antes de su caja.
 function teleport(i) {
   const next = Math.min(N - 1, Math.max(0, i));
-  const s = stationPos[next];
+  const s = approachPos[next];
   car.x = s.x;
   car.z = s.z;
   car.yaw = s.yaw;
   car.speed = 0;
   car.y = 0;
+  car.vy = 0;
+  car.groundY = heightAt(ramps, car.x, car.z);
+  car.y = car.groundY;
   if (next !== index) setIndex(next);
 }
 
@@ -611,14 +578,16 @@ function frame(now) {
   elapsed += dt;
 
   drive(dt);
+  updateVertical(dt);
   animateWheels(dt);
   if (started) {
-    checkStations();
+    collideCar(car, obstacles, debris, onStationBreak);
     updateSocials();
   } else {
     const pulse = 1 + Math.sin(elapsed * 3) * 0.04;
-    startRings.forEach((r) => r.scale.setScalar(pulse));
+    startRings.forEach((r) => (r.scale.setScalar(pulse)));
   }
+  debris.update(dt);
 
   carPivot.position.set(car.x, car.y, car.z);
   carPivot.rotation.y = car.yaw;
@@ -650,8 +619,13 @@ Promise.all([
     matcaps[name] = maps[i];
   });
 
-  buildTrack();
+  buildTrack(scene, curve);
   buildMarkers();
+  buildStationCrates();
+  const scenery = buildScenery(scene, curve, [...stationPos, ...socialItems]);
+  obstacles.push(...scenery.obstacles);
+  ramps = scenery.ramps;
+  debris = createDebris(scene);
   buildStartRing();
   setupCar({ chassis, antena, brake, reverse, wheel }, matcaps);
 
