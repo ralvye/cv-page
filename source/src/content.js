@@ -1,10 +1,17 @@
+// Redes que aparecen en el suelo cerca del inicio.
+export const socials = [
+  { label: 'GitHub', href: 'https://github.com/ralvye' },
+  { label: 'LinkedIn', href: 'https://www.linkedin.com/in/ralvye' },
+  { label: 'Email', href: 'mailto:ralvearye@gmail.com' },
+];
+
 export const stations = [
   {
     label: 'Inicio',
     title: 'Rodrigo Alvear Yévenes',
     lead: 'Ingeniero DevOps Senior',
     blocks: [
-      { text: 'Maneja el auto con ↑ ↓ ← → (o W A S D) y pasa por los anillos de colores para abrir cada sección.' },
+      { text: 'Maneja el auto con ↑ ↓ ← → (o W A S D). Pasa por encima de los iconos del suelo para abrir cada sección.' },
     ],
   },
   {

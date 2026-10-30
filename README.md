@@ -47,10 +47,17 @@ Para publicar, copia el contenido de `source/dist/` dentro de `web/`
 
 Edita `source/src/content.js`. Cada entrada de `stations` es una sección
 con `label`, `title`, `lead` y `blocks` (textos, listas, empleos o enlaces).
-Cada entrada corresponde a un anillo en la isla, en el mismo orden.
+Cada entrada corresponde a un icono en el suelo, en el mismo orden.
+Las redes sociales están en `socials` del mismo archivo.
 
 ## Créditos
 
-La estética y la mecánica de conducción se inspiran en
-[folio-2025](https://github.com/brunosimon/folio-2025) de Bruno Simon (MIT).
-No se copió código ni modelos de ese proyecto: la escena es una implementación nueva.
+Este proyecto usa assets de [folio-2025](https://github.com/brunosimon/folio-2025)
+de Bruno Simon, bajo licencia MIT (ver `source/public/FOLIO-2025-LICENSE.md`):
+
+- `source/public/terrain/` (terreno y textura)
+- `source/public/vehicle/` (modelo del auto)
+- `source/public/favicons/` (íconos de la pestaña)
+- `source/public/palette.png`
+
+El código de la escena (`source/src/`) fue escrito para este proyecto, inspirado en el juego de Bruno.

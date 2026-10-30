@@ -1,28 +1,37 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { stations } from './content.js';
+import { stations, socials } from './content.js';
 import './style.css';
 
 const N = stations.length;
-const STEP = 16;
-const PATH_Y = 0.3;
-const SEA_Y = -1.2;
-const WATER_Y = -0.5;
-const STATION_RADIUS = 5;
-const MAX_SPEED = 24;
-const MAX_REVERSE = 6;
+const ASSETS = import.meta.env.BASE_URL;
+const TRACK_RX = 30;
+const TRACK_RZ = 24;
+const ROAD_HALF = 2.4;
+const ROAD_LIFT = 0.1;
+const WATER_Y = -0.55;
+const STATION_RADIUS = 4;
+const SOCIAL_RADIUS = 3.5;
+const SOCIAL_ARC = 7;
+const CAR_LENGTH = 3;
+const MAX_SPEED = 26;
+const MAX_REVERSE = 7;
 
-const PATH_COLOR = 0x2b2d33;
-const SAND_COLOR = 0x5a4d36;
-const GRASS_COLOR = 0x2f4a2c;
-const HILL_COLOR = 0x203522;
-const MARKER_COLORS = [0x22d3ee, 0xf472b6, 0xfacc15, 0x4ade80, 0xa78bfa, 0xfb7185, 0x38bdf8, 0xfb923c];
+// Terreno de Bruno: malla de 129x129 vértices sobre ±96 unidades.
+const VERTS = 129;
+const HALF = 96;
+const CELL = (HALF * 2) / (VERTS - 1);
+let heights = null;
 
 const canvas = document.getElementById('scene');
 const card = document.getElementById('card');
 const dotsEl = document.getElementById('dots');
 const prevBtn = document.getElementById('prev');
 const nextBtn = document.getElementById('next');
+const socialEl = document.getElementById('social');
+const socialName = document.getElementById('social-name');
+const socialOpen = document.getElementById('social-open');
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
@@ -34,7 +43,7 @@ renderer.toneMappingExposure = 1.1;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x070b14);
 scene.fog = new THREE.Fog(0x070b14, 60, 190);
-// Entorno suave para reflejos en el auto, las ventanas y el agua.
+// Entorno suave para reflejos en el auto y el agua.
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.2;
@@ -75,7 +84,7 @@ const rand = mulberry32(7);
   scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xcbd5ff, size: 1.4, sizeAttenuation: false, fog: false })));
 }
 
-// Texturas procedurales (sin imágenes externas): ruido de color sobre un fondo base.
+// Texturas procedurales: asfalto y etiquetas de los iconos del suelo.
 function noiseTexture(base, speckles, draw) {
   const size = 256;
   const c = document.createElement('canvas');
@@ -96,8 +105,6 @@ function noiseTexture(base, speckles, draw) {
   tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
   return tex;
 }
-const grassTex = noiseTexture('#ffffff', ['#000000', '#3a3a3a', '#ffffff']);
-grassTex.repeat.set(60, 30);
 const asphaltTex = noiseTexture('#3a3d45', ['#1b1d22', '#5a5e68'], (g, s) => {
   g.fillStyle = 'rgba(232,232,232,0.85)';
   g.fillRect(10, 0, 6, s);
@@ -105,35 +112,142 @@ const asphaltTex = noiseTexture('#3a3d45', ['#1b1d22', '#5a5e68'], (g, s) => {
   g.fillStyle = '#d9b44a';
   for (let y = 0; y < s; y += 64) g.fillRect(s / 2 - 4, y, 8, 36);
 });
-const pondTex = noiseTexture('#ffffff', ['#000000', '#5f8fb0', '#ffffff']);
-pondTex.repeat.set(30, 30);
 
-
-function smoothstep(a, b, x) {
-  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
-  return t * t * (3 - 2 * t);
+// Icono plano para el suelo: disco o etiqueta oscura con texto blanco (estilo Bruno).
+function iconTexture(text, shape) {
+  const w = shape === 'pill' ? 512 : 256;
+  const h = 256;
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  const g = c.getContext('2d');
+  g.fillStyle = '#251f2b';
+  g.beginPath();
+  if (shape === 'pill') g.roundRect(8, 8, w - 16, h - 16, 60);
+  else g.arc(w / 2, h / 2, w / 2 - 8, 0, Math.PI * 2);
+  g.fill();
+  g.strokeStyle = '#ffffff';
+  g.lineWidth = 8;
+  g.stroke();
+  g.fillStyle = '#ffffff';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = shape === 'pill' ? '700 110px Nunito, system-ui, sans-serif' : '900 120px Nunito, system-ui, sans-serif';
+  g.fillText(text, w / 2, h / 2 + 8);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
 }
 
-// Trazado de la carretera: las estaciones se ubican sobre esta curva.
-const controlPoints = stations.map((_, i) => new THREE.Vector3(i * STEP, PATH_Y, Math.sin(i * 0.9) * 10));
-const curve = new THREE.CatmullRomCurve3(controlPoints, false, 'catmullrom', 0.5);
-const samples = curve.getSpacedPoints(360);
-const cx = ((N - 1) * STEP) / 2;
+// Colores del suelo como en Bruno: el canal azul elige el degradado (arena, agua turquesa, mar profundo)
+// y el canal verde mezcla el color de hierba. Se hornea una vez en una textura normal.
+const GRADIENT_STOPS = [
+  { t: 0.1, c: [0xff, 0xa9, 0x4e] },
+  { t: 0.3, c: [0x5b, 0xc2, 0xb9] },
+  { t: 0.9, c: [0x13, 0x37, 0x5f] },
+];
+const GRASS = [0xb8, 0xb6, 0x2e];
+
+function gradientAt(t) {
+  if (t <= GRADIENT_STOPS[0].t) return GRADIENT_STOPS[0].c;
+  const last = GRADIENT_STOPS[GRADIENT_STOPS.length - 1];
+  if (t >= last.t) return last.c;
+  for (let i = 0; i < GRADIENT_STOPS.length - 1; i++) {
+    const a = GRADIENT_STOPS[i];
+    const b = GRADIENT_STOPS[i + 1];
+    if (t <= b.t) {
+      const k = (t - a.t) / (b.t - a.t);
+      return a.c.map((v, j) => v + (b.c[j] - v) * k);
+    }
+  }
+  return last.c;
+}
+
+function bakeTerrainColors(src) {
+  const w = src.image.width;
+  const h = src.image.height;
+  const src2d = document.createElement('canvas');
+  src2d.width = w;
+  src2d.height = h;
+  const sg = src2d.getContext('2d', { willReadFrequently: true });
+  sg.drawImage(src.image, 0, 0);
+  const data = sg.getImageData(0, 0, w, h);
+  const px = data.data;
+  for (let i = 0; i < px.length; i += 4) {
+    const g = px[i + 1] / 255;
+    const base = gradientAt(1 - px[i + 2] / 255);
+    for (let j = 0; j < 3; j++) {
+      px[i + j] = base[j] + (GRASS[j] - base[j]) * g;
+    }
+    px[i + 3] = 255;
+  }
+  sg.putImageData(data, 0, 0);
+  const tex = new THREE.CanvasTexture(src2d);
+  tex.flipY = false;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+// Altura del terreno: interpolación bilineal de la malla de Bruno.
+function heightAt(x, z) {
+  const fx = Math.min(VERTS - 1.001, Math.max(0, (x + HALF) / CELL));
+  const fz = Math.min(VERTS - 1.001, Math.max(0, (z + HALF) / CELL));
+  const ix = Math.floor(fx);
+  const iz = Math.floor(fz);
+  const tx = fx - ix;
+  const tz = fz - iz;
+  const i = iz * VERTS + ix;
+  const top = heights[i] * (1 - tx) + heights[i + 1] * tx;
+  const bottom = heights[i + VERTS] * (1 - tx) + heights[i + VERTS + 1] * tx;
+  return top * (1 - tz) + bottom * tz;
+}
+
+// Circuito cerrado sobre la isla; las estaciones se reparten a lo largo de él.
+const trackPoints = Array.from({ length: 16 }, (_, i) => {
+  const t = (i / 16) * Math.PI * 2;
+  return new THREE.Vector3(TRACK_RX * Math.cos(t), 0, TRACK_RZ * Math.sin(t));
+});
+const curve = new THREE.CatmullRomCurve3(trackPoints, true, 'centripetal');
 
 const stationPos = stations.map((_, i) => {
-  const p = curve.getPointAt(i / (N - 1));
-  const t = curve.getTangentAt(i / (N - 1));
+  const u = i / N;
+  const p = curve.getPointAt(u);
+  const t = curve.getTangentAt(u);
   return { x: p.x, z: p.z, yaw: Math.atan2(t.x, t.z) };
 });
 
-// Carretera: una cinta de asfalto a lo largo de la curva.
-const ROAD_HALF = 2.5;
-const ROAD_Y = PATH_Y + 0.06;
-const roadMesh = (() => {
-  const SEG = 360;
+// Mapa del suelo: el terreno real de Bruno, con su textura.
+function buildTerrain(gltf, texture) {
+  let geo = null;
+  gltf.scene.traverse((o) => {
+    if (!geo && o.isMesh) geo = o.geometry;
+  });
+  const pos = geo.attributes.position;
+  heights = new Float32Array(VERTS * VERTS);
+  for (let v = 0; v < pos.count; v++) {
+    const ix = Math.round((pos.getX(v) + HALF) / CELL);
+    const iz = Math.round((pos.getZ(v) + HALF) / CELL);
+    heights[iz * VERTS + ix] = pos.getY(v);
+  }
+  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ map: texture, roughness: 0.95 }));
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+
+  const water = new THREE.Mesh(
+    new THREE.CircleGeometry(400, 64).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({ color: 0x0f2740, roughness: 0.25, metalness: 0.1 })
+  );
+  water.position.y = WATER_Y;
+  scene.add(water);
+}
+
+// Carretera: cinta de asfalto que sigue la altura del terreno.
+function buildRoad() {
+  const SEG = 400;
   const pos = [];
   const uv = [];
-  const nrm = [];
   const index = [];
   let len = 0;
   let prev = null;
@@ -146,9 +260,10 @@ const roadMesh = (() => {
     const l = Math.hypot(tan.x, tan.z);
     const nx = (-tan.z / l) * ROAD_HALF;
     const nz = (tan.x / l) * ROAD_HALF;
-    pos.push(p.x + nx, ROAD_Y, p.z + nz, p.x - nx, ROAD_Y, p.z - nz);
+    const yl = heightAt(p.x + nx, p.z + nz) + ROAD_LIFT;
+    const yr = heightAt(p.x - nx, p.z - nz) + ROAD_LIFT;
+    pos.push(p.x + nx, yl, p.z + nz, p.x - nx, yr, p.z - nz);
     uv.push(0, len / 9, 1, len / 9);
-    nrm.push(0, 1, 0, 0, 1, 0);
     if (i < SEG) {
       const a = i * 2;
       index.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
@@ -157,184 +272,76 @@ const roadMesh = (() => {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
-  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
   geo.setIndex(index);
+  geo.computeVertexNormals();
   const mesh = new THREE.Mesh(
     geo,
     new THREE.MeshStandardMaterial({ map: asphaltTex, roughness: 0.85, metalness: 0.05, side: THREE.DoubleSide })
   );
   mesh.receiveShadow = true;
-  return mesh;
-})();
-scene.add(roadMesh);
-
-
-// Altura del terreno y distancia a la carretera en el plano XZ.
-function landInfo(x, z) {
-  let d2 = Infinity;
-  for (const p of samples) {
-    const dx = p.x - x;
-    const dz = p.z - z;
-    const v = dx * dx + dz * dz;
-    if (v < d2) d2 = v;
-  }
-  const d = Math.sqrt(d2);
-  const shore = smoothstep(16, 26, d);
-  const hills = 1.2 + Math.sin(x * 0.31) * Math.cos(z * 0.37) * 1.4 + Math.sin(x * 0.83 + z * 0.61) * 0.35;
-  const inland = Math.max(0, hills) * (1 - shore);
-  const land = PATH_Y + inland * smoothstep(3.6, 8, d);
-  const h = land + (SEA_Y - land) * shore;
-  return { h, d };
-}
-
-const groundGeo = new THREE.PlaneGeometry(340, 180, 170, 90);
-groundGeo.rotateX(-Math.PI / 2);
-groundGeo.translate(cx, 0, 0);
-const groundPos = groundGeo.attributes.position;
-const groundColors = new Float32Array(groundPos.count * 3);
-const tmpColor = new THREE.Color();
-for (let i = 0; i < groundPos.count; i++) {
-  const x = groundPos.getX(i);
-  const z = groundPos.getZ(i);
-  const { h, d } = landInfo(x, z);
-  groundPos.setY(i, h);
-  if (d < 2.6) tmpColor.setHex(PATH_COLOR);
-  else if (h < 0.7) tmpColor.setHex(SAND_COLOR);
-  else tmpColor.setHex(h < 3.2 ? GRASS_COLOR : HILL_COLOR);
-  groundColors.set([tmpColor.r, tmpColor.g, tmpColor.b], i * 3);
-}
-groundGeo.setAttribute('color', new THREE.BufferAttribute(groundColors, 3));
-groundGeo.computeVertexNormals();
-const groundMesh = new THREE.Mesh(
-  groundGeo,
-  new THREE.MeshStandardMaterial({ vertexColors: true, map: grassTex, roughness: 0.95 })
-);
-groundMesh.receiveShadow = true;
-scene.add(groundMesh);
-
-const water = new THREE.Mesh(
-  new THREE.CircleGeometry(400, 64).rotateX(-Math.PI / 2),
-  new THREE.MeshStandardMaterial({ color: 0x0c2a44, map: pondTex, roughness: 0.15, metalness: 0.2 })
-);
-water.position.set(cx, WATER_Y, 0);
-scene.add(water);
-
-// Árboles con InstancedMesh.
-const treeSpots = [];
-for (let attempt = 0; attempt < 2000 && treeSpots.length < 90; attempt++) {
-  const x = -20 + rand() * (cx * 2 + 40);
-  const z = (rand() - 0.5) * 80;
-  const { h, d } = landInfo(x, z);
-  if (h > 0.9 && d > 6 && rand() < 0.5) {
-    treeSpots.push({ x, z, h, s: 0.8 + rand() * 0.6, r: rand() * Math.PI * 2 });
-  }
-}
-const trunkGeo = new THREE.CylinderGeometry(0.25, 0.35, 1.6, 6);
-trunkGeo.translate(0, 0.8, 0);
-const leafGeo = new THREE.ConeGeometry(1.4, 3.2, 12);
-leafGeo.translate(0, 2.9, 0);
-const trunks = new THREE.InstancedMesh(
-  trunkGeo,
-  new THREE.MeshStandardMaterial({ color: 0x3b2a1a, roughness: 0.9 }),
-  treeSpots.length
-);
-const leaves = new THREE.InstancedMesh(
-  leafGeo,
-  new THREE.MeshStandardMaterial({ color: 0x1d3d25, roughness: 0.8 }),
-  treeSpots.length
-);
-trunks.castShadow = leaves.castShadow = true;
-trunks.receiveShadow = leaves.receiveShadow = true;
-const matrix = new THREE.Matrix4();
-const q = new THREE.Quaternion();
-const up = new THREE.Vector3(0, 1, 0);
-treeSpots.forEach((t, i) => {
-  q.setFromAxisAngle(up, t.r);
-  matrix.compose(new THREE.Vector3(t.x, t.h, t.z), q, new THREE.Vector3(t.s, t.s, t.s));
-  trunks.setMatrixAt(i, matrix);
-  leaves.setMatrixAt(i, matrix);
-});
-scene.add(trunks, leaves);
-
-// Estaciones: anillo luminoso en el suelo y un icosaedro flotante.
-const markers = [];
-const rings = [];
-stations.forEach((_, i) => {
-  const { x, z } = stationPos[i];
-  const color = MARKER_COLORS[i % MARKER_COLORS.length];
-
-  const base = new THREE.Mesh(
-    new THREE.CylinderGeometry(2.2, 2.4, 0.4, 40),
-    new THREE.MeshLambertMaterial({ color: 0x1a1d26 })
-  );
-  base.position.set(x, PATH_Y + 0.02, z);
-  scene.add(base);
-
-  const ring = new THREE.Mesh(
-    new THREE.TorusGeometry(STATION_RADIUS - 1, 0.18, 8, 48).rotateX(Math.PI / 2),
-    new THREE.MeshBasicMaterial({ color, transparent: true })
-  );
-  ring.position.set(x, PATH_Y + 0.1, z);
-  scene.add(ring);
-  rings.push(ring);
-
-  const markerY = PATH_Y + 5;
-  const mesh = new THREE.Mesh(
-    new THREE.IcosahedronGeometry(1.1, 0),
-    new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.6, flatShading: true })
-  );
-  mesh.position.set(x, markerY, z);
   scene.add(mesh);
-  markers.push({ mesh, y: markerY, phase: i * 0.7 });
-});
+}
 
-// Auto: carrocería, cabina, alerón, ruedas y faros.
-function buildCar() {
-  const g = new THREE.Group();
-  const paint = new THREE.MeshStandardMaterial({ color: 0xd7263d, metalness: 0.5, roughness: 0.3 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x14161c, roughness: 0.7 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0x2a3c55, metalness: 0.3, roughness: 0.15 });
-  const silver = new THREE.MeshStandardMaterial({ color: 0xb8c0cc, metalness: 0.9, roughness: 0.25 });
-  const lamp = new THREE.MeshBasicMaterial({ color: 0xfff1b8 });
+// Marcadores del suelo (se crean cuando el terreno ya está cargado, porque usan su altura).
+let stationDiscs = [];
+let socialItems = [];
 
-  const lower = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.55, 3.4), paint);
-  lower.position.y = 0.6;
-  const cabin = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.55, 1.7), glass);
-  cabin.position.set(0, 1.15, -0.1);
-  const spoiler = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 0.4), dark);
-  spoiler.position.set(0, 1.0, -1.6);
-  g.add(lower, cabin, spoiler);
+function buildMarkers() {
+  // Estaciones: icono plano en el suelo; al pasar encima se abre su sección.
+  stationDiscs = stations.map((_, i) => {
+    const { x, z } = stationPos[i];
+    const mesh = new THREE.Mesh(
+      new THREE.CircleGeometry(1.5, 48).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ map: iconTexture(String(i + 1), 'disc'), transparent: true, depthWrite: false })
+    );
+    mesh.position.set(x, heightAt(x, z) + 0.12, z);
+    scene.add(mesh);
+    return mesh;
+  });
 
-  const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.32, 20).rotateZ(Math.PI / 2);
-  const hubGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.34, 12).rotateZ(Math.PI / 2);
-  for (const [x, z] of [
-    [-0.9, 1.15],
-    [0.9, 1.15],
-    [-0.9, -1.15],
-    [0.9, -1.15],
-  ]) {
-    const w = new THREE.Mesh(wheelGeo, dark);
-    w.position.set(x, 0.42, z);
-    const hub = new THREE.Mesh(hubGeo, silver);
-    hub.position.set(x, 0.42, z);
-    g.add(w, hub);
-  }
+  // Redes sociales: etiquetas en un arco frente al inicio, con su propio botón al estar cerca.
+  socialItems = socials.map((s, i) => {
+    const a = -Math.PI * 0.8 + (i / (socials.length - 1)) * Math.PI * 0.6;
+    const x = SOCIAL_ARC * Math.cos(a);
+    const z = SOCIAL_ARC * Math.sin(a);
+    const mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(3.4, 1.7).rotateX(-Math.PI / 2),
+      new THREE.MeshBasicMaterial({ map: iconTexture(s.label, 'pill'), transparent: true, depthWrite: false })
+    );
+    mesh.position.set(x, heightAt(x, z) + 0.12, z);
+    scene.add(mesh);
+    return { ...s, x, z, mesh };
+  });
+}
 
-  const headGeo = new THREE.BoxGeometry(0.3, 0.18, 0.05);
-  for (const x of [-0.55, 0.55]) {
-    const lampMesh = new THREE.Mesh(headGeo, lamp);
-    lampMesh.position.set(x, 0.7, 1.72);
-    g.add(lampMesh);
-  }
-  g.traverse((o) => {
+// Auto: modelo de Bruno, centrado, con el frente en +X y ajustado al suelo.
+const carPivot = new THREE.Group();
+scene.add(carPivot);
+let carYawOffset = 0;
+
+function setupCar(gltf) {
+  const model = gltf.scene;
+  model.traverse((o) => {
     if (o.isMesh) o.castShadow = true;
   });
-  return g;
+  carPivot.add(model);
+
+  model.updateMatrixWorld(true);
+  let box = new THREE.Box3().setFromObject(model);
+  model.scale.multiplyScalar(CAR_LENGTH / box.getSize(new THREE.Vector3()).x);
+  model.updateMatrixWorld(true);
+  box = new THREE.Box3().setFromObject(model);
+  const c = box.getCenter(new THREE.Vector3());
+  model.position.set(-c.x, -box.min.y, -c.z);
+  model.updateMatrixWorld(true);
+
+  // Los faros van delante de las luces traseras: eso define el sentido de marcha.
+  const back = new THREE.Box3().setFromObject(model.getObjectByName('backLights')).getCenter(new THREE.Vector3());
+  const front = new THREE.Box3().setFromObject(model.getObjectByName('headlights001')).getCenter(new THREE.Vector3());
+  carYawOffset = front.x > back.x ? -Math.PI / 2 : Math.PI / 2;
 }
 
-const carMesh = buildCar();
-scene.add(carMesh);
-const car = { x: 0, z: 0, y: PATH_Y, yaw: 0, speed: 0 };
+const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0 };
 
 // Controles: teclado (flechas o WASD) y botones táctiles.
 const KEY_ACTIONS = {
@@ -350,6 +357,10 @@ const KEY_ACTIONS = {
 const input = { gas: false, brake: false, left: false, right: false };
 
 window.addEventListener('keydown', (e) => {
+  if (e.code === 'Enter' && activeSocial && !(e.target instanceof HTMLButtonElement)) {
+    openSocial(activeSocial);
+    return;
+  }
   const act = KEY_ACTIONS[e.code];
   if (!act) return;
   e.preventDefault();
@@ -394,14 +405,14 @@ function drive(dt) {
 
   const nx = car.x + Math.sin(car.yaw) * car.speed * dt;
   const nz = car.z + Math.cos(car.yaw) * car.speed * dt;
-  // El mar bloquea el paso: el auto rebota.
-  if (landInfo(nx, nz).h < 0) {
+  // El agua bloquea el paso: el auto rebota.
+  if (heightAt(nx, nz) < WATER_Y + 0.1) {
     car.speed *= -0.3;
   } else {
     car.x = nx;
     car.z = nz;
   }
-  car.y = landInfo(car.x, car.z).h;
+  car.y = heightAt(car.x, car.z);
 }
 
 function checkStations() {
@@ -415,6 +426,49 @@ function checkStations() {
     }
   }
 }
+
+// Redes sociales: al estar cerca aparece la etiqueta con el botón para abrirlas.
+let activeSocial = null;
+const _v = new THREE.Vector3();
+
+function openSocial(s) {
+  const a = document.createElement('a');
+  a.href = s.href;
+  if (s.href.startsWith('http')) {
+    a.target = '_blank';
+    a.rel = 'noopener';
+  }
+  a.click();
+}
+
+function setActiveSocial(s) {
+  if (s === activeSocial) return;
+  activeSocial = s;
+  socialEl.hidden = !s;
+  if (s) socialName.textContent = s.label;
+}
+
+function updateSocials() {
+  let near = null;
+  for (const s of socialItems) {
+    const dx = car.x - s.x;
+    const dz = car.z - s.z;
+    if (dx * dx + dz * dz < SOCIAL_RADIUS * SOCIAL_RADIUS) {
+      near = s;
+      break;
+    }
+  }
+  setActiveSocial(near);
+  if (near) {
+    _v.set(near.x, heightAt(near.x, near.z) + 1.8, near.z).project(camera);
+    const px = ((_v.x + 1) / 2) * window.innerWidth;
+    const py = ((1 - _v.y) / 2) * window.innerHeight;
+    socialEl.style.transform = `translate(${px}px, ${py}px)`;
+  }
+}
+socialOpen.addEventListener('click', () => {
+  if (activeSocial) openSocial(activeSocial);
+});
 
 // Navegación de tarjetas.
 let index = 0;
@@ -507,7 +561,7 @@ function teleport(i) {
   car.z = s.z;
   car.yaw = s.yaw;
   car.speed = 0;
-  car.y = landInfo(car.x, car.z).h;
+  car.y = heightAt(car.x, car.z);
   if (next !== index) setIndex(next);
 }
 
@@ -560,26 +614,39 @@ function frame(now) {
 
   drive(dt);
   checkStations();
+  updateSocials();
 
-  carMesh.position.set(car.x, car.y, car.z);
-  carMesh.rotation.y = car.yaw;
+  carPivot.position.set(car.x, car.y, car.z);
+  carPivot.rotation.y = car.yaw + carYawOffset;
   moon.position.set(car.x - 40, 80, car.z - 30);
   moon.target.position.set(car.x, 0, car.z);
   updateCamera(dt);
 
-  for (const m of markers) {
-    m.mesh.rotation.y += dt * 0.8;
-    m.mesh.position.y = m.y + Math.sin(elapsed * 1.6 + m.phase) * 0.25;
-  }
-  rings.forEach((r, i) => {
-    r.material.opacity = 0.7 + Math.sin(elapsed * 2 + i) * 0.3;
-  });
+  stationDiscs.forEach((d, i) => d.scale.setScalar(1 + Math.sin(elapsed * 2 + i) * 0.03));
 
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 
-resize();
-teleport(0);
-setIndex(0, true);
-requestAnimationFrame(frame);
+// Carga de assets de Bruno (MIT, ver FOLIO-2025-LICENSE.md) y arranque del juego.
+const loader = new GLTFLoader();
+const textureLoader = new THREE.TextureLoader();
+Promise.all([
+  loader.loadAsync(`${ASSETS}terrain/terrain.glb`),
+  textureLoader.loadAsync(`${ASSETS}terrain/terrain.png`),
+  loader.loadAsync(`${ASSETS}vehicle/default.glb`),
+]).then(([terrainGltf, terrainTex, carGltf]) => {
+  terrainTex.flipY = false;
+  terrainTex.colorSpace = THREE.SRGBColorSpace;
+  terrainTex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  buildTerrain(terrainGltf, bakeTerrainColors(terrainTex));
+  buildRoad();
+  buildMarkers();
+  setupCar(carGltf);
+
+  resize();
+  teleport(0);
+  setIndex(0, true);
+  requestAnimationFrame(frame);
+});

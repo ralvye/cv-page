@@ -5,13 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Rodrigo Alvear Yévenes · Ingeniero DevOps Senior</title>
     <meta name="description" content="CV de Rodrigo Alvear Yévenes, Ingeniero DevOps Senior." />
-    <link rel="icon" href="/images/apple-touch-icon.png" />
-    <script type="module" crossorigin src="/assets/index-B_JYh3Q8.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-C66Go6yn.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Amatic+SC:wght@700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/svg+xml" href="/favicons/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicons/favicon-96x96.png" />
+    <link rel="shortcut icon" href="/favicons/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/favicons/apple-touch-icon.png" />
+    <link rel="manifest" href="/favicons/site.webmanifest" />
+    <script type="module" crossorigin src="/assets/index-DMjvOJnH.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-CTNC0Mrv.css">
   </head>
   <body>
     <canvas id="scene"></canvas>
-    <p class="hint">Conduce con ↑ ↓ ← → o W A S D · pasa por los anillos para ver cada sección</p>
+    <p class="hint">Conduce con ↑ ↓ ← → o W A S D · pasa por encima de los iconos del suelo para ver cada sección</p>
+    <div id="social" class="social" hidden>
+      <span id="social-name"></span>
+      <button id="social-open" type="button">Abrir · Enter</button>
+    </div>
     <main id="card" aria-live="polite"></main>
     <nav class="nav" aria-label="Secciones">
       <button id="prev" aria-label="Sección anterior">←</button>
