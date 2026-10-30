@@ -1,6 +1,6 @@
 ====================================================
-  ralvye.com - Landing Page 3D
-  Pagina personal con monitor CRT voxel en Three.js
+  ralvye.com - CV en 3D
+  Pagina personal estilo isla interactiva en Three.js
 ====================================================
 
 
@@ -16,53 +16,58 @@ INICIO RAPIDO (sin instalar nada)
 
 ESTRUCTURA DE ARCHIVOS
 -----------------------
-  landing-page/
+  cv-page/
   |-- INICIAR.bat       <- Lanzador (doble clic para ver la pagina)
   |-- servidor.ps1      <- Servidor HTTP en PowerShell (sin instalar nada)
   |-- INSTRUCCIONES.txt <- Este archivo
-  |-- web/              <- Sitio web compilado (listo para servir)
+  |-- web/              <- Sitio compilado (listo para servir)
   |   |-- index.html
-  |   |-- assets/       <- JS compilado
-  |   |-- draco/        <- Decodificador 3D (sin necesidad de internet)
-  |   |-- crt-draco.glb <- Modelo 3D del monitor CRT
-  |   `-- millennium-falcon.png
+  |   |-- cv.html       <- CV en texto, version simple
+  |   |-- assets/       <- JS y CSS compilados
+  |   `-- images/
   `-- source/           <- Codigo fuente (para modificar/desarrollar)
+      |-- index.html
+      |-- package.json
+      |-- public/       <- Archivos estaticos (cv.html, sitemap, imagenes)
+      `-- src/
+          |-- main.js     <- Escena 3D, camara y navegacion
+          |-- content.js  <- Textos del CV (cambiar aqui el contenido)
+          `-- style.css   <- Estilos de la tarjeta y de la barra de navegacion
 
 
 SI QUIERES MODIFICAR EL CODIGO FUENTE
 ---------------------------------------
   Requisitos previos:
     - Node.js 18+   -> https://nodejs.org  (descargar LTS)
-    - pnpm          -> ejecutar en terminal: npm install -g pnpm
 
   Pasos:
     1. Abrir terminal (CMD o PowerShell) en la carpeta source/
     2. Instalar dependencias:
-         pnpm install
+         npm install
     3. Iniciar servidor de desarrollo (con recarga automatica):
-         pnpm dev
+         npm run dev
     4. Abrir en el navegador: http://localhost:5173/
-    5. Editar main.js o index.html y los cambios se aplican al instante
+    5. Editar content.js o main.js y los cambios se aplican al instante
 
   Para generar una nueva version compilada:
-         pnpm build
-  (Los archivos resultantes quedan en source/dist/)
+         npm run build
+  Luego copiar el contenido de source/dist/ dentro de web/
+  (reemplazando los archivos anteriores) y ejecutar INICIAR.bat.
 
 
 TECNOLOGIAS UTILIZADAS
 -----------------------
-  - Three.js 0.183.1   : Motor de renderizado 3D
-  - cannon-es 0.20.0   : Motor de fisica (click para explotar voxels)
-  - Vite 7.3.1         : Bundler y servidor de desarrollo
+  - Three.js 0.183    : Motor de renderizado 3D
+  - Vite 7            : Bundler y servidor de desarrollo
 
 
 NOTAS TECNICAS
 --------------
-  - El modelo CRT esta comprimido con Draco (crt-draco.glb, 74KB)
-  - Los decoders Draco estan incluidos localmente (web/draco/)
-    por lo que la pagina funciona SIN conexion a internet
-  - La imagen millennium-falcon.png se convierte en voxels 3D en tiempo real
-  - Fisica activada con click: los voxels explotan y caen con gravedad
+  - La escena es una isla procedural: el terreno, los arboles y las nubes
+    se generan en el navegador, sin modelos 3D externos.
+  - Cada estacion de la isla corresponde a una seccion del CV (content.js).
+  - Navegacion: rueda del mouse, flechas del teclado, deslizar en el celular
+    o los botones de la barra inferior.
 
 
 SOPORTE
