@@ -4,7 +4,7 @@ Página personal de Rodrigo Alvear Yévenes con forma de juego de conducción:
 manejas un auto por una isla nocturna y, al pasar por cada anillo de colores,
 se abre una sección del CV.
 
-Demo local: abrir `web/index.html` con el servidor incluido (`INICIAR.bat` en Windows).
+Demo local: abrir `web/index.html` con cualquier servidor estático (por ejemplo `npx serve web`).
 
 ## Controles
 
@@ -16,9 +16,7 @@ Demo local: abrir `web/index.html` con el servidor incluido (`INICIAR.bat` en Wi
 
 ```
 cv-page/
-├── INICIAR.bat        Lanzador para Windows (sirve web/ en localhost:8080)
-├── servidor.ps1       Servidor HTTP en PowerShell
-├── INSTRUCCIONES.txt  Guía de uso para Windows
+├── INSTRUCCIONES.txt  Guía de uso
 ├── web/               Sitio compilado, listo para publicar
 └── source/            Código fuente (Vite + Three.js)
     ├── index.html

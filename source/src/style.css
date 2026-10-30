@@ -296,3 +296,66 @@ body {
     height: 46px;
   }
 }
+
+/* Pantalla de inicio: fondo púrpura con puntos y texto dibujado a mano. */
+.start {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  background: radial-gradient(ellipse at center, rgba(70, 40, 120, 0.35), rgba(30, 14, 60, 0.6));
+  transition: opacity 0.6s ease;
+  user-select: none;
+  outline: none;
+}
+.start.leaving {
+  opacity: 0;
+  pointer-events: none;
+}
+.idle .hint,
+.idle #card,
+.idle .nav,
+.idle .pad {
+  visibility: hidden;
+}
+.start-dots {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(190, 150, 255, 0.35) 1.5px, transparent 1.6px);
+  background-size: 22px 22px;
+  pointer-events: none;
+}
+.start-cta {
+  position: absolute;
+  left: 50%;
+  top: 74%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  pointer-events: none;
+}
+.start-arrow {
+  width: 120px;
+  height: 120px;
+  margin-left: -150px;
+  transform: translateY(-40px);
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.5));
+}
+.start-text {
+  font-family: 'Amatic SC', cursive;
+  font-weight: 700;
+  font-size: clamp(44px, 7vw, 84px);
+  letter-spacing: 3px;
+  color: #fff;
+  text-shadow: 0 0 14px rgba(200, 160, 255, 0.8);
+  animation: start-pulse 1.6s ease-in-out infinite;
+}
+@keyframes start-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}

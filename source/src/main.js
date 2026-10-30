@@ -41,8 +41,8 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x070b14);
-scene.fog = new THREE.Fog(0x070b14, 60, 190);
+scene.background = new THREE.Color(0x3b2a6b);
+scene.fog = new THREE.Fog(0x3b2a6b, 70, 200);
 // Entorno suave para reflejos en el auto y el agua.
 const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -69,20 +69,6 @@ function mulberry32(seed) {
   };
 }
 const rand = mulberry32(7);
-
-// Campo de estrellas en el cielo.
-{
-  const count = 700;
-  const pts = new Float32Array(count * 3);
-  for (let i = 0; i < count; i++) {
-    const th = rand() * Math.PI * 2;
-    const ph = rand() * Math.PI * 0.42;
-    pts.set([300 * Math.cos(th) * Math.cos(ph), 300 * Math.sin(ph) + 20, 300 * Math.sin(th) * Math.cos(ph)], i * 3);
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
-  scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xcbd5ff, size: 1.4, sizeAttenuation: false, fog: false })));
-}
 
 // Texturas procedurales: asfalto y etiquetas de los iconos del suelo.
 function noiseTexture(base, speckles, draw) {
@@ -324,6 +310,20 @@ function setupCar(gltf) {
   model.traverse((o) => {
     if (o.isMesh) o.castShadow = true;
   });
+
+  // El GLB trae una sola rueda: se copia a las cuatro esquinas.
+  const wheel = model.getObjectByName('wheelContainer001');
+  if (wheel) {
+    const { x, y, z } = wheel.position;
+    const ax = Math.abs(x);
+    const az = Math.abs(z);
+    for (const [sx, sz] of [[1, 1], [-1, 1], [-1, -1]]) {
+      const w = wheel.clone();
+      w.position.set(sx * ax, y, sz * az);
+      if (sx < 0) w.rotation.y = Math.PI;
+      model.add(w);
+    }
+  }
   carPivot.add(model);
 
   model.updateMatrixWorld(true);
@@ -390,6 +390,7 @@ for (const btn of document.querySelectorAll('[data-act]')) {
 }
 
 function drive(dt) {
+  if (!started) return;
   const { gas, brake, left, right } = input;
   if (gas) car.speed += 16 * dt;
   if (brake) car.speed -= (car.speed > 0.5 ? 26 : 10) * dt;
@@ -607,14 +608,57 @@ window.addEventListener('resize', resize);
 
 let last = performance.now();
 let elapsed = 0;
+let started = false;
+let startRings = [];
+const startEl = document.getElementById('start');
+document.body.classList.add('idle');
+
+function startGame() {
+  if (started) return;
+  started = true;
+  startEl.classList.add('leaving');
+  document.body.classList.remove('idle');
+  startRings.forEach((r) => (r.visible = false));
+}
+startEl.addEventListener('click', startGame);
+window.addEventListener('keydown', (e) => {
+  if (!started && (e.code === 'Enter' || e.code === 'Space' || e.code in KEY_ACTIONS)) {
+    e.preventDefault();
+    startGame();
+  }
+});
+
+// Anillo de luz alrededor del punto de inicio, visible hasta empezar.
+function buildStartRing() {
+  const s = stationPos[0];
+  const y = heightAt(s.x, s.z) + 0.12;
+  const mat = (opacity) =>
+    new THREE.MeshBasicMaterial({ color: 0xb48cff, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide });
+  startRings = [
+    [3.4, 3.8, 0.95],
+    [3.8, 5.2, 0.3],
+  ].map(([inner, outer, opacity]) => {
+    const m = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 96), mat(opacity));
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(s.x, y, s.z);
+    scene.add(m);
+    return m;
+  });
+}
+
 function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
   elapsed += dt;
 
   drive(dt);
-  checkStations();
-  updateSocials();
+  if (started) {
+    checkStations();
+    updateSocials();
+  } else {
+    const pulse = 1 + Math.sin(elapsed * 3) * 0.04;
+    startRings.forEach((r) => r.scale.setScalar(pulse));
+  }
 
   carPivot.position.set(car.x, car.y, car.z);
   carPivot.rotation.y = car.yaw + carYawOffset;
@@ -643,6 +687,7 @@ Promise.all([
   buildTerrain(terrainGltf, bakeTerrainColors(terrainTex));
   buildRoad();
   buildMarkers();
+  buildStartRing();
   setupCar(carGltf);
 
   resize();

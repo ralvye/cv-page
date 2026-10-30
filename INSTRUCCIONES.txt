@@ -4,21 +4,15 @@
 ====================================================
 
 
-INICIO RAPIDO (sin instalar nada)
-----------------------------------
-  1. Doble clic en INICIAR.bat
-  2. Se abre automaticamente tu navegador en http://localhost:8080/
-  3. Para detener: cierra la ventana negra del servidor
-
-  Requisito: Windows 7 o superior (incluye PowerShell de serie)
-  No necesita Node.js, Python ni ningun otro programa.
+VER LA PAGINA
+-------------
+  Abrir web/index.html con cualquier servidor estatico, por ejemplo:
+    npx serve web
 
 
 ESTRUCTURA DE ARCHIVOS
 -----------------------
   cv-page/
-  |-- INICIAR.bat       <- Lanzador (doble clic para ver la pagina)
-  |-- servidor.ps1      <- Servidor HTTP en PowerShell (sin instalar nada)
   |-- INSTRUCCIONES.txt <- Este archivo
   |-- web/              <- Sitio compilado (listo para servir)
   |   |-- index.html
@@ -52,7 +46,7 @@ SI QUIERES MODIFICAR EL CODIGO FUENTE
   Para generar una nueva version compilada:
          npm run build
   Luego copiar el contenido de source/dist/ dentro de web/
-  (reemplazando los archivos anteriores) y ejecutar INICIAR.bat.
+  (reemplazando los archivos anteriores) y abrir web/index.html.
 
 
 TECNOLOGIAS UTILIZADAS
