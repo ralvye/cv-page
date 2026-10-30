@@ -59,46 +59,6 @@ moon.shadow.bias = -0.0008;
 moon.shadow.normalBias = 0.04;
 scene.add(moon, moon.target);
 
-function mulberry32(seed) {
-  return () => {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-const rand = mulberry32(7);
-
-// Texturas procedurales: asfalto y etiquetas de los iconos del suelo.
-function noiseTexture(base, speckles, draw) {
-  const size = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const g = c.getContext('2d');
-  g.fillStyle = base;
-  g.fillRect(0, 0, size, size);
-  for (let i = 0; i < size * 8; i++) {
-    g.fillStyle = speckles[Math.floor(rand() * speckles.length)];
-    g.globalAlpha = 0.1 + rand() * 0.3;
-    g.fillRect(rand() * size, rand() * size, 1 + rand() * 3, 1 + rand() * 3);
-  }
-  g.globalAlpha = 1;
-  draw?.(g, size);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
-  return tex;
-}
-const asphaltTex = noiseTexture('#3a3d45', ['#1b1d22', '#5a5e68'], (g, s) => {
-  g.fillStyle = 'rgba(232,232,232,0.85)';
-  g.fillRect(10, 0, 6, s);
-  g.fillRect(s - 16, 0, 6, s);
-  g.fillStyle = '#d9b44a';
-  for (let y = 0; y < s; y += 64) g.fillRect(s / 2 - 4, y, 8, 36);
-});
-
 // Icono plano para el suelo: disco o etiqueta oscura con texto blanco (estilo Bruno).
 function iconTexture(text, shape) {
   const w = shape === 'pill' ? 512 : 256;
@@ -142,18 +102,16 @@ const stationPos = stations.map((_, i) => {
 
 // Pasto: plano grande que se funde con la niebla morada.
 function buildGround() {
-  const grassTex = noiseTexture('#4d8a2c', ['#33621c', '#6ca443', '#2c5418', '#8cbc52'], null);
-  grassTex.repeat.set(160, 160);
   const grass = new THREE.Mesh(
     new THREE.PlaneGeometry(ARENA_HALF * 2 + 40, ARENA_HALF * 2 + 40).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 })
+    new THREE.MeshStandardMaterial({ color: 0x5f9e3c, roughness: 1 })
   );
   grass.receiveShadow = true;
   scene.add(grass);
 }
 
 // Cinta plana que sigue la pista entre los desplazamientos a y b (perpendiculares al eje).
-function buildStrip(a, b, material, uRepeat = 1) {
+function buildStrip(a, b, material, uRepeat = 1, lift = ROAD_LIFT) {
   const SEG = 400;
   const pos = [];
   const uv = [];
@@ -169,7 +127,7 @@ function buildStrip(a, b, material, uRepeat = 1) {
     const l = Math.hypot(tan.x, tan.z);
     const nx = -tan.z / l;
     const nz = tan.x / l;
-    pos.push(p.x + nx * a, ROAD_LIFT, p.z + nz * a, p.x + nx * b, ROAD_LIFT, p.z + nz * b);
+    pos.push(p.x + nx * a, lift, p.z + nz * a, p.x + nx * b, lift, p.z + nz * b);
     uv.push(0, len / 9, uRepeat, len / 9);
     if (i < SEG) {
       const k = i * 2;
@@ -205,12 +163,14 @@ function buildTrack() {
   buildGround();
   const kerbMat = new THREE.MeshStandardMaterial({ map: kerbTex, roughness: 0.7, side: THREE.DoubleSide });
   const asphaltMat = new THREE.MeshStandardMaterial({
-    map: asphaltTex,
-    roughness: 0.85,
-    metalness: 0.05,
+    color: 0x4a4d55,
+    roughness: 0.9,
     side: THREE.DoubleSide,
   });
+  const lineMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.8, side: THREE.DoubleSide });
   buildStrip(-ROAD_HALF, ROAD_HALF, asphaltMat);
+  buildStrip(ROAD_HALF - 0.6, ROAD_HALF, lineMat, 1, ROAD_LIFT + 0.04);
+  buildStrip(-ROAD_HALF, -ROAD_HALF + 0.6, lineMat, 1, ROAD_LIFT + 0.04);
   buildStrip(ROAD_HALF, ROAD_HALF + 0.9, kerbMat, 4);
   buildStrip(-ROAD_HALF - 0.9, -ROAD_HALF, kerbMat, 4);
 }

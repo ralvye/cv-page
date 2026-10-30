@@ -22,7 +22,7 @@ cv-page/
     ├── index.html
     ├── public/        Archivos estáticos (cv.html, sitemap, robots, imágenes)
     └── src/
-        ├── main.js    Escena 3D, física del auto, cámara y texturas
+        ├── main.js    Escena 3D, física del auto, cámara y pista
         ├── content.js Textos del CV (aquí se edita el contenido)
         └── style.css  Tarjeta, barra de navegación y botones táctiles
 ```
