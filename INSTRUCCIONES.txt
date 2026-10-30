@@ -63,13 +63,12 @@ TECNOLOGIAS UTILIZADAS
 
 NOTAS TECNICAS
 --------------
-  - La escena es una isla procedural: el terreno, los arboles y las nubes
-    se generan en el navegador, sin modelos 3D externos.
+  - La escena es una isla procedural: el terreno, los arboles y el campo de
+    estrellas se generan en el navegador, sin modelos 3D externos.
   - Cada estacion de la isla corresponde a una seccion del CV (content.js).
   - Conduccion: flechas o WASD para manejar el auto; al pasar por un anillo se abre su seccion.
     En el celular se usan los botones tactiles de la pantalla.
   - Los botones de la barra inferior (flechas y puntos) saltan directo a cada seccion.
-    o los botones de la barra inferior.
 
 
 SOPORTE
