@@ -51,7 +51,7 @@ Las redes sociales están en `socials` del mismo archivo.
 ## Créditos
 
 Este proyecto usa assets de [folio-2025](https://github.com/brunosimon/folio-2025)
-de Bruno Simon, bajo licencia MIT (ver `source/public/FOLIO-2025-LICENSE.md`):
+de Bruno Simon:
 
 - `source/public/favicons/` (íconos de la pestaña)
 

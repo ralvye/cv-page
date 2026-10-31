@@ -381,8 +381,8 @@ function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
     if (!o.isMesh) return;
     if (['head-light-left', 'head-light-right', 'tail-light-left', 'tail-light-right'].includes(o.name)) return;
     const c = matcapColor(o);
-    // Detalles grises y blancos un poco más oscuros: el tinte multiplica el matcap.
-    const tint = { gray: 0x9a9a9a, white: 0xb4b4b4 };
+    // Detalles grises y blancos un poco más oscuros; el rojo se satura más: el tinte multiplica el matcap.
+    const tint = { gray: 0x9a9a9a, white: 0xb4b4b4, red: 0xff1a10 };
     mats[c] ??= new THREE.MeshMatcapMaterial({ matcap: matcaps[c], color: tint[c] ?? 0xffffff });
     o.material = mats[c];
     o.castShadow = true;
