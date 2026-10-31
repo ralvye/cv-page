@@ -142,11 +142,13 @@ function buildGround(scene) {
 
 // Cinta plana que sigue la pista entre los desplazamientos a y b (perpendiculares al eje).
 // t0..t1 limita el tramo de la pista que se dibuja (0..1).
-function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT, t0 = 0, t1 = 1) {
+// Si fadeFrom está definido, la cinta se difumina de fadeFrom a t1 hasta desaparecer.
+function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT, t0 = 0, t1 = 1, fadeFrom = null) {
   const SEG = Math.max(1, Math.ceil(1200 * (t1 - t0)));
   const pos = [];
   const uv = [];
   const index = [];
+  const rgba = [];
   let len = 0;
   let prev = null;
   for (let i = 0; i <= SEG; i++) {
@@ -157,6 +159,8 @@ function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT,
     prev = p;
     pos.push(p.x + nx * a, lift, p.z + nz * a, p.x + nx * b, lift, p.z + nz * b);
     uv.push(0, len / 9, uRepeat, len / 9);
+    const alpha = fadeFrom === null ? 1 : Math.min(1, Math.max(0, (t1 - t) / (t1 - fadeFrom)));
+    rgba.push(1, 1, 1, alpha, 1, 1, 1, alpha);
     if (i < SEG) {
       const k = i * 2;
       index.push(k, k + 1, k + 2, k + 1, k + 3, k + 2);
@@ -167,6 +171,11 @@ function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT,
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(index);
   geo.computeVertexNormals();
+  if (fadeFrom !== null) {
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(rgba, 4));
+    material = material.clone();
+    Object.assign(material, { vertexColors: true, transparent: true, depthWrite: false });
+  }
   const mesh = new THREE.Mesh(geo, material);
   mesh.receiveShadow = true;
   scene.add(mesh);
@@ -232,6 +241,10 @@ export function buildTrack(scene, curve) {
   buildStrip(scene, curve, -ROAD_HALF, ROAD_HALF, asphaltMat, 1, ROAD_LIFT, 0, cut);
   buildStrip(scene, curve, ROAD_HALF - 0.22, ROAD_HALF, lineMat, 1.4, ROAD_LIFT + 0.04, 0, cut);
   buildStrip(scene, curve, -ROAD_HALF, -ROAD_HALF + 0.22, lineMat, 1.4, ROAD_LIFT + 0.04, 0, cut);
+  // Tramo final difuminado: la pista se funde con el asfalto de la rotonda.
+  buildStrip(scene, curve, -ROAD_HALF, ROAD_HALF, asphaltMat, 1, ROAD_LIFT, cut, 1, cut);
+  buildStrip(scene, curve, ROAD_HALF - 0.22, ROAD_HALF, lineMat, 1.4, ROAD_LIFT + 0.04, cut, 1, cut);
+  buildStrip(scene, curve, -ROAD_HALF, -ROAD_HALF + 0.22, lineMat, 1.4, ROAD_LIFT + 0.04, cut, 1, cut);
   for (const [t0, t1] of curveRanges(curve, cut)) {
     buildStrip(scene, curve, ROAD_HALF + 0.02, ROAD_HALF + 0.22, kerbMat, 3.5, ROAD_LIFT, t0, t1);
     buildStrip(scene, curve, -ROAD_HALF - 0.22, -ROAD_HALF - 0.02, kerbMat, 3.5, ROAD_LIFT, t0, t1);
@@ -255,9 +268,13 @@ export function roundaboutLayout(curve) {
   return { x, z, rIn: RING_IN, rOut: RING_OUT, icons: [at(-ICON_SPREAD), at(ICON_SPREAD)] };
 }
 
+// Altura del pequeño cerro bajo cada icono social; los cubos se apoyan en su cima.
+export const ICON_MOUND_H = 1.4;
+
 export function buildRoundabout(scene, layout) {
   const asphaltMat = new THREE.MeshStandardMaterial({ map: asphaltTexture(), color: 0x41464d, roughness: 0.95, side: THREE.DoubleSide });
   const lineMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.8, side: THREE.DoubleSide });
+  const grassMat = new THREE.MeshStandardMaterial({ color: 0x4f8a3a, roughness: 0.95, flatShading: true });
   const place = (geo, mat, lift) => {
     const m = new THREE.Mesh(geo.rotateX(-Math.PI / 2), mat);
     m.position.set(layout.x, lift, layout.z);
@@ -266,6 +283,11 @@ export function buildRoundabout(scene, layout) {
   place(new THREE.RingGeometry(layout.rIn, layout.rOut, 96), asphaltMat, ROAD_LIFT);
   place(new THREE.RingGeometry(layout.rIn, layout.rIn + 0.22, 96), lineMat, ROAD_LIFT + 0.04);
   place(new THREE.RingGeometry(layout.rOut - 0.22, layout.rOut, 96), lineMat, ROAD_LIFT + 0.04);
+  for (const icon of layout.icons) {
+    const mound = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.6, ICON_MOUND_H, 20), grassMat);
+    mound.position.set(icon.x, ROAD_LIFT + ICON_MOUND_H / 2, icon.z);
+    scene.add(mound);
+  }
 }
 
 // Charcos que cruzan la pista: tramos rectos donde el agua tapa el asfalto.

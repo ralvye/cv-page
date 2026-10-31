@@ -12,6 +12,7 @@ import {
   buildTrack,
   buildRoundabout,
   roundaboutLayout,
+  ICON_MOUND_H,
   buildTunnels,
   buildScenery,
   buildWater,
@@ -223,7 +224,7 @@ function buildMarkers() {
         new THREE.BoxGeometry(4, 4, 4).translate(0, 2, 0),
         new THREE.MeshStandardMaterial({ map: logoTexture(s.logo, s.color), roughness: 0.5 })
       );
-      cube.position.set(x, 0, z);
+      cube.position.set(x, ROAD_LIFT + ICON_MOUND_H, z);
       cube.castShadow = true;
       scene.add(cube);
       obstacles.push({ x, z, r: 2.4, solid: false, drag: 0.7, group: cube, kind: 'social', color: s.color });
@@ -380,12 +381,9 @@ function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
     if (!o.isMesh) return;
     if (['head-light-left', 'head-light-right', 'tail-light-left', 'tail-light-right'].includes(o.name)) return;
     const c = matcapColor(o);
-    // La carrocería roja del juego se pinta amarillo pato: matcap amarillo con tinte más saturado.
     // Detalles grises y blancos un poco más oscuros: el tinte multiplica el matcap.
     const tint = { gray: 0x9a9a9a, white: 0xb4b4b4 };
-    mats[c] ??= c === 'red'
-      ? new THREE.MeshMatcapMaterial({ matcap: matcaps.yellow, color: 0xffd60a })
-      : new THREE.MeshMatcapMaterial({ matcap: matcaps[c], color: tint[c] ?? 0xffffff });
+    mats[c] ??= new THREE.MeshMatcapMaterial({ matcap: matcaps[c], color: tint[c] ?? 0xffffff });
     o.material = mats[c];
     o.castShadow = true;
   });
