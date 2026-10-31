@@ -4,10 +4,20 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { stations, socials } from './content.js';
 import {
   ARENA_HALF,
+  ROAD_LIFT,
+  TRACK_SCALE,
+  TUNNEL_U,
   createTrack,
   poseAt,
   buildTrack,
+  buildRoundabout,
+  roundaboutLayout,
+  buildTunnels,
   buildScenery,
+  buildWater,
+  buildBridge,
+  buildMountains,
+  inWater,
   heightAt,
   createDebris,
   collideCar,
@@ -20,6 +30,7 @@ const SOCIAL_RADIUS = 3.5;
 const SOCIAL_ARC = 7;
 const CAR_LENGTH = 3;
 const MAX_SPEED = 26;
+const WATER_MAX_SPEED = 9;
 const MAX_REVERSE = 7;
 const GRAVITY = 30;
 const APPROACH = 12;
@@ -29,6 +40,7 @@ const STATION_COLOR = 0xe07b22;
 let wheelRigs = [];
 let steerDir = 0;
 let steerAngle = 0;
+let carLights = { head: [], tail: [] };
 
 const canvas = document.getElementById('scene');
 const card = document.getElementById('card');
@@ -54,7 +66,7 @@ const pmrem = new THREE.PMREMGenerator(renderer);
 scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
 scene.environmentIntensity = 0.2;
 
-const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 900);
 
 scene.add(new THREE.HemisphereLight(0x5a6fa8, 0x0b120b, 0.8));
 const moon = new THREE.DirectionalLight(0xaebfff, 1.7);
@@ -65,17 +77,52 @@ moon.shadow.bias = -0.0008;
 moon.shadow.normalBias = 0.04;
 scene.add(moon, moon.target);
 
-// Icono plano para el suelo: disco o etiqueta oscura con texto blanco (estilo Bruno).
-function iconTexture(text, shape) {
-  const w = shape === 'pill' ? 512 : 256;
-  const h = 256;
+const weatherParticles = { rain: null, snow: null };
+function buildWeatherParticles() {
+  const rainGeo = new THREE.BufferGeometry();
+  const rainPositions = new Float32Array(900 * 3);
+  for (let i = 0; i < rainPositions.length; i += 3) {
+    rainPositions[i] = (Math.random() - 0.5) * 140;
+    rainPositions[i + 1] = 4 + Math.random() * 28;
+    rainPositions[i + 2] = (Math.random() - 0.5) * 140;
+  }
+  rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPositions, 3));
+  weatherParticles.rain = new THREE.Points(
+    rainGeo,
+    new THREE.PointsMaterial({ color: 0x9fd1ff, size: 0.18, transparent: true, opacity: 0.75 })
+  );
+  weatherParticles.rain.visible = false;
+  scene.add(weatherParticles.rain);
+
+  const snowGeo = new THREE.BufferGeometry();
+  const snowPositions = new Float32Array(700 * 3);
+  for (let i = 0; i < snowPositions.length; i += 3) {
+    snowPositions[i] = (Math.random() - 0.5) * 110;
+    snowPositions[i + 1] = 4 + Math.random() * 32;
+    snowPositions[i + 2] = (Math.random() - 0.5) * 110;
+  }
+  snowGeo.setAttribute('position', new THREE.BufferAttribute(snowPositions, 3));
+  weatherParticles.snow = new THREE.Points(
+    snowGeo,
+    new THREE.PointsMaterial({ color: 0xf3f7ff, size: 0.22, transparent: true, opacity: 0.85 })
+  );
+  weatherParticles.snow.visible = false;
+  scene.add(weatherParticles.snow);
+}
+buildWeatherParticles();
+
+// Icono plano para el suelo: disco o etiqueta oscura con texto blanco; 'badge' es un cuadrado de marca.
+function iconTexture(text, shape, fill = '#251f2b') {
+  const w = shape === 'pill' ? 512 : shape === 'badge' ? 512 : 256;
+  const h = shape === 'badge' ? 512 : 256;
   const c = document.createElement('canvas');
   c.width = w;
   c.height = h;
   const g = c.getContext('2d');
-  g.fillStyle = '#251f2b';
+  g.fillStyle = fill;
   g.beginPath();
   if (shape === 'pill') g.roundRect(8, 8, w - 16, h - 16, 60);
+  else if (shape === 'badge') g.roundRect(8, 8, w - 16, h - 16, 90);
   else g.arc(w / 2, h / 2, w / 2 - 8, 0, Math.PI * 2);
   g.fill();
   g.strokeStyle = '#ffffff';
@@ -84,8 +131,29 @@ function iconTexture(text, shape) {
   g.fillStyle = '#ffffff';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.font = shape === 'pill' ? '700 110px Nunito, system-ui, sans-serif' : '900 120px Nunito, system-ui, sans-serif';
+  if (shape === 'badge') g.font = '800 104px Nunito, system-ui, sans-serif';
+  else g.font = shape === 'pill' ? '700 110px Nunito, system-ui, sans-serif' : '900 120px Nunito, system-ui, sans-serif';
   g.fillText(text, w / 2, h / 2 + 8);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+// Logo oficial (ruta SVG de simple-icons, 24×24) sobre fondo blanco, en el color de la marca.
+function logoTexture(path, color) {
+  const s = 512;
+  const c = document.createElement('canvas');
+  c.width = s;
+  c.height = s;
+  const g = c.getContext('2d');
+  g.fillStyle = '#ffffff';
+  g.fillRect(0, 0, s, s);
+  const k = (s * 0.6) / 24;
+  g.translate((s - 24 * k) / 2, (s - 24 * k) / 2);
+  g.scale(k, k);
+  g.fillStyle = color;
+  g.fill(new Path2D(path));
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
@@ -95,6 +163,11 @@ function iconTexture(text, shape) {
 // Pista lineal (ver world.js). La estación 0 es el inicio; las demás son cajas sobre la pista.
 const curve = createTrack();
 const TRACK_LEN = curve.getLength();
+// El ciclo de clima sigue a la distancia original de la pista, así que su ritmo no cambia al acortarla.
+const WEATHER_CYCLE_LEN = (TRACK_LEN / TRACK_SCALE) * 0.85;
+const roundabout = roundaboutLayout(curve);
+const tunnelU = TUNNEL_U;
+const tunnelPos = tunnelU.map((u) => poseAt(curve, u));
 const STATION_U = stations.map((_, i) => (i === 0 ? 0 : 0.12 + (i - 1) * 0.14));
 const stationPos = STATION_U.map((u) => poseAt(curve, u));
 const approachPos = STATION_U.map((u) => poseAt(curve, Math.max(0, u - APPROACH / TRACK_LEN)));
@@ -105,6 +178,11 @@ let socialItems = [];
 // Obstáculos (sólidos o rompibles) y partículas al romperse.
 let obstacles = [];
 let ramps = [];
+let waterZones = [];
+let waterTexture = null;
+let splashTimer = 0;
+const MOUNTAIN_BASE = new THREE.Color(0x4f4478);
+const mountainMaterial = buildMountains(scene);
 let debris = null;
 
 function buildMarkers() {
@@ -120,9 +198,11 @@ function buildMarkers() {
     return mesh;
   });
 
-  // Redes sociales: etiquetas en un arco frente al inicio, con su propio botón al estar cerca.
-  socialItems = socials.map((s, i) => {
-    const a = -Math.PI * 0.8 + (i / (socials.length - 1)) * Math.PI * 0.6;
+  // Redes sociales en un arco frente al inicio, con su propio botón al estar cerca.
+  const arc = socials.filter((s) => !s.ring);
+  const arcItems = arc.map((s, i) => {
+    const t = arc.length > 1 ? i / (arc.length - 1) : 0.5;
+    const a = -Math.PI * 0.8 + t * Math.PI * 0.6;
     const x = SOCIAL_ARC * Math.cos(a);
     const z = SOCIAL_ARC * Math.sin(a);
     const mesh = new THREE.Mesh(
@@ -131,8 +211,26 @@ function buildMarkers() {
     );
     mesh.position.set(x, 0.12, z);
     scene.add(mesh);
-    return { ...s, x, z, mesh };
+    return { ...s, x, z };
   });
+
+  // Redes de la rotonda: cubos 3D con el logo oficial en el centro hueco; se rompen al pasar, como las cajas.
+  const ringItems = socials
+    .filter((s) => s.ring)
+    .map((s, i) => {
+      const { x, z } = roundabout.icons[i];
+      const cube = new THREE.Mesh(
+        new THREE.BoxGeometry(4, 4, 4).translate(0, 2, 0),
+        new THREE.MeshStandardMaterial({ map: logoTexture(s.logo, s.color), roughness: 0.5 })
+      );
+      cube.position.set(x, 0, z);
+      cube.castShadow = true;
+      scene.add(cube);
+      obstacles.push({ x, z, r: 2.4, solid: false, drag: 0.7, group: cube, kind: 'social', color: s.color });
+      return { ...s, x, z };
+    });
+
+  socialItems = [...arcItems, ...ringItems];
 }
 
 // Cajas naranjas sobre la pista: cada una lleva el número de la sección y se rompe al pasar.
@@ -159,7 +257,7 @@ function buildStationCrates() {
   });
 }
 
-// Auto: piezas del juego 2019 de Bruno (MIT, ver README). Vienen con Z hacia arriba y el frente en +X;
+// Auto: piezas del juego 2019 de Bruno Simon, adaptadas por Roy. Vienen con Z hacia arriba y el frente en +X;
 // se giran para que el frente quede en +Z, que es el sentido de marcha de carPivot.
 const carPivot = new THREE.Group();
 scene.add(carPivot);
@@ -174,6 +272,33 @@ function matcapColor(obj) {
     if (n.startsWith('pureYellow')) return 'yellow';
   }
   return 'gray';
+}
+
+// Halo suave de luz: textura radial compartida y aditiva para que no tape la escena.
+let glowTexture = null;
+function glowSprite(rgb, scale) {
+  if (!glowTexture) {
+    const cv = document.createElement('canvas');
+    cv.width = cv.height = 64;
+    const g = cv.getContext('2d');
+    const grd = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grd.addColorStop(0, 'rgba(255,255,255,1)');
+    grd.addColorStop(0.25, 'rgba(255,255,255,0.45)');
+    grd.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = grd;
+    g.fillRect(0, 0, 64, 64);
+    glowTexture = new THREE.CanvasTexture(cv);
+  }
+  const mat = new THREE.SpriteMaterial({
+    map: glowTexture,
+    color: new THREE.Color(`rgb(${rgb})`),
+    blending: THREE.AdditiveBlending,
+    transparent: true,
+    depthWrite: false,
+  });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.setScalar(scale);
+  return sprite;
 }
 
 function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
@@ -208,33 +333,100 @@ function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
     wheels.push({ steer: front ? steer : null, spin, radius: wheelR });
   }
 
+  const headLensGeo = new THREE.CircleGeometry(0.1, 16).rotateY(Math.PI / 2);
+  const tailLensGeo = new THREE.CircleGeometry(0.12, 16).rotateY(-Math.PI / 2);
+  const headLightMat = new THREE.MeshBasicMaterial({ color: 0xfff4c7, side: THREE.DoubleSide });
+  const tailLightMat = new THREE.MeshBasicMaterial({ color: 0xff332d, side: THREE.DoubleSide });
+  const frontLeft = new THREE.Mesh(headLensGeo, headLightMat);
+  frontLeft.name = 'head-light-left';
+  const frontRight = new THREE.Mesh(headLensGeo, headLightMat);
+  frontRight.name = 'head-light-right';
+  const rearLeft = new THREE.Mesh(tailLensGeo, tailLightMat);
+  rearLeft.name = 'tail-light-left';
+  const rearRight = new THREE.Mesh(tailLensGeo, tailLightMat);
+  rearRight.name = 'tail-light-right';
+  const headL = new THREE.PointLight(0xfff0bf, 0, 18, 2);
+  const headR = new THREE.PointLight(0xfff0bf, 0, 18, 2);
+  const tailL = new THREE.PointLight(0xff332d, 0, 14, 2);
+  const tailR = new THREE.PointLight(0xff332d, 0, 14, 2);
+  const headGlow = [glowSprite('255, 240, 190', 0.9), glowSprite('255, 240, 190', 0.9)];
+  const tailGlow = [glowSprite('255, 60, 50', 0.7), glowSprite('255, 60, 50', 0.7)];
+
+  const lightMeshes = [frontLeft, frontRight, rearLeft, rearRight, ...headGlow, ...tailGlow];
+  [
+    { obj: frontLeft, pos: [1.05, -0.45, 0.8] },
+    { obj: frontRight, pos: [1.05, 0.45, 0.8] },
+    { obj: rearLeft, pos: [-1.05, -0.45, 0.6] },
+    { obj: rearRight, pos: [-1.05, 0.45, 0.6] },
+    { obj: headGlow[0], pos: [1.2, -0.45, 0.8] },
+    { obj: headGlow[1], pos: [1.2, 0.45, 0.8] },
+    { obj: tailGlow[0], pos: [-1.2, -0.45, 0.6] },
+    { obj: tailGlow[1], pos: [-1.2, 0.45, 0.6] },
+    { obj: headL, pos: [1.1, -0.45, 0.8] },
+    { obj: headR, pos: [1.1, 0.45, 0.8] },
+    { obj: tailL, pos: [-1.1, -0.45, 0.6] },
+    { obj: tailR, pos: [-1.1, 0.45, 0.6] },
+  ].forEach(({ obj, pos }) => {
+    obj.position.set(...pos);
+    parts.add(obj);
+  });
+  carLights = {
+    head: [frontLeft, frontRight, headL, headR, ...headGlow],
+    tail: [rearLeft, rearRight, tailL, tailR, ...tailGlow],
+  };
+
   const mats = {};
   parts.traverse((o) => {
     if (!o.isMesh) return;
+    if (['head-light-left', 'head-light-right', 'tail-light-left', 'tail-light-right'].includes(o.name)) return;
     const c = matcapColor(o);
-    mats[c] ??= new THREE.MeshMatcapMaterial({ matcap: matcaps[c] });
+    // La carrocería roja del juego se pinta amarillo pato: matcap amarillo con tinte más saturado.
+    // Detalles grises y blancos un poco más oscuros: el tinte multiplica el matcap.
+    const tint = { gray: 0x9a9a9a, white: 0xb4b4b4 };
+    mats[c] ??= c === 'red'
+      ? new THREE.MeshMatcapMaterial({ matcap: matcaps.yellow, color: 0xffd60a })
+      : new THREE.MeshMatcapMaterial({ matcap: matcaps[c], color: tint[c] ?? 0xffffff });
     o.material = mats[c];
     o.castShadow = true;
   });
 
-  // Escala por largo, luego centrado en X/Z y apoyado en el suelo.
-  let box = new THREE.Box3().setFromObject(pose);
-  const s = CAR_LENGTH / box.getSize(new THREE.Vector3()).z;
+  // Escala y apoyo calculados solo con carrocería y ruedas, sin las esferas de luz.
+  const bodyBox = () => {
+    pose.updateMatrixWorld(true);
+    const b = new THREE.Box3();
+    for (const ch of parts.children) if (!lightMeshes.includes(ch)) b.expandByObject(ch);
+    return b;
+  };
+  const s = CAR_LENGTH / bodyBox().getSize(new THREE.Vector3()).z;
   parts.scale.setScalar(s);
-  box = new THREE.Box3().setFromObject(pose);
+  const box = bodyBox();
   const c = box.getCenter(new THREE.Vector3());
-  pose.position.set(-c.x, -box.min.y, -c.z);
+  // Las ruedas quedan sobre la pista: el borde inferior va a la altura de la cinta.
+  pose.position.set(-c.x, ROAD_LIFT - box.min.y, -c.z);
   carPivot.add(pose);
+  carPivot.updateMatrixWorld(true);
 
   wheelRigs = wheels.map((w) => ({ ...w, radius: w.radius * s }));
 }
 
 // Ruedas: las delanteras giran al doblar y todas ruedan según la velocidad.
 function animateWheels(dt) {
-  steerAngle += (-steerDir * 0.5 - steerAngle) * Math.min(1, dt * 10);
+  steerAngle += (-steerDir * 0.8 - steerAngle) * Math.min(1, dt * 12);
   for (const r of wheelRigs) {
     if (r.steer) r.steer.rotation.z = steerAngle;
     r.spin.rotation.y += (car.speed * dt) / r.radius;
+  }
+}
+
+function updateVehicleLights(isDark) {
+  if (!carLights || !carLights.head.length) return;
+  for (const light of carLights.head) {
+    if (light.isPointLight) light.intensity = isDark ? 2.6 : 0;
+    else light.visible = isDark;
+  }
+  for (const light of carLights.tail) {
+    if (light.isPointLight) light.intensity = isDark ? 1.4 : 0;
+    else light.visible = isDark;
   }
 }
 
@@ -286,6 +478,11 @@ for (const btn of document.querySelectorAll('[data-act]')) {
   btn.addEventListener('pointercancel', off);
 }
 
+// Mojado: dentro del río/lagos, pero no sobre el puente (car.groundY alto).
+function isWet() {
+  return inWater(waterZones, car.x, car.z) && car.groundY < 0.5;
+}
+
 function drive(dt) {
   if (!started) return;
   const { gas, brake, left, right } = input;
@@ -295,12 +492,13 @@ function drive(dt) {
     const drag = Math.min(Math.abs(car.speed), 8 * dt);
     car.speed -= Math.sign(car.speed) * drag;
   }
-  car.speed = Math.min(MAX_SPEED, Math.max(-MAX_REVERSE, car.speed));
+  car.speed = Math.min(isWet() ? WATER_MAX_SPEED : MAX_SPEED, Math.max(-MAX_REVERSE, car.speed));
 
-  const grip = Math.min(1, Math.abs(car.speed) / 8);
+  const grip = Math.min(1.15, 0.42 + Math.abs(car.speed) / 16);
   const steer = (right ? 1 : 0) - (left ? 1 : 0);
   steerDir = steer;
-  if (steer) car.yaw -= steer * 2.2 * grip * Math.sign(car.speed) * dt;
+  const turnRate = 0.74 * (0.34 + grip);
+  if (steer) car.yaw -= steer * turnRate * Math.sign(car.speed || 1) * dt;
 
   const nx = car.x + Math.sin(car.yaw) * car.speed * dt;
   const nz = car.z + Math.cos(car.yaw) * car.speed * dt;
@@ -475,6 +673,14 @@ function setIndex(i, instant = false) {
   renderCard(i, instant);
   updateDots();
   updateProgress();
+  updateCardVisibility();
+}
+
+function updateCardVisibility() {
+  const target = stationPos[index];
+  const d = Math.hypot(car.x - target.x, car.z - target.z);
+  const visible = d < 18;
+  card.classList.toggle('show', visible);
 }
 
 // Lleva el auto a una sección (botones y puntos), unos metros antes de su caja.
@@ -500,10 +706,12 @@ const camPos = new THREE.Vector3();
 const camLook = new THREE.Vector3();
 let camReady = false;
 function updateCamera(dt) {
-  const back = 9;
+  const inTunnel = tunnelPos.some((p) => Math.hypot(car.x - p.x, car.z - p.z) < 10);
+  const back = inTunnel ? 2.2 : 9;
+  const lift = inTunnel ? 2.1 : 4.5;
   const tx = car.x - Math.sin(car.yaw) * back;
   const tz = car.z - Math.cos(car.yaw) * back;
-  const ty = car.y + 4.5;
+  const ty = car.y + lift;
   if (!camReady) {
     camPos.set(tx, ty, tz);
     camReady = true;
@@ -514,7 +722,11 @@ function updateCamera(dt) {
     camPos.z += (tz - camPos.z) * k;
   }
   camera.position.copy(camPos);
-  camLook.set(car.x + Math.sin(car.yaw) * 3, car.y + 1.2, car.z + Math.cos(car.yaw) * 3);
+  camLook.set(
+    car.x + Math.sin(car.yaw) * (inTunnel ? 9 : 3),
+    car.y + (inTunnel ? 1.1 : 1.2),
+    car.z + Math.cos(car.yaw) * (inTunnel ? 9 : 3),
+  );
   camera.lookAt(camLook);
 }
 
@@ -534,10 +746,95 @@ window.addEventListener('resize', resize);
 
 let last = performance.now();
 let elapsed = 0;
+let travelDistance = 0;
 let started = false;
 let startRings = [];
 const startEl = document.getElementById('start');
 document.body.classList.add('idle');
+
+const currentWeather = {
+  sky: new THREE.Color(0xcfe5ff),
+  fog: new THREE.Color(0x9ec7ff),
+  moonIntensity: 0.35,
+  rainActive: false,
+  snowActive: false,
+};
+
+function updateWeather(dt) {
+  if (started) travelDistance += Math.abs(car.speed) * dt;
+  const cycle = (travelDistance / WEATHER_CYCLE_LEN) % 1;
+  let targetSky = new THREE.Color(0xcfe5ff);
+  let targetFog = new THREE.Color(0x9ec7ff);
+  let targetMoon = 0.35;
+  let rainActive = false;
+  let snowActive = false;
+
+  if (cycle < 0.24) {
+    targetSky = new THREE.Color(0xbfe2ff);
+    targetFog = new THREE.Color(0x9cc3ff);
+    targetMoon = 0.25;
+  } else if (cycle < 0.42) {
+    targetSky = new THREE.Color(0xf1b47a);
+    targetFog = new THREE.Color(0xc98862);
+    targetMoon = 0.45;
+  } else if (cycle < 0.6) {
+    targetSky = new THREE.Color(0x1d2346);
+    targetFog = new THREE.Color(0x131a2f);
+    targetMoon = 1.7;
+  } else if (cycle < 0.82) {
+    targetSky = new THREE.Color(0x243a4d);
+    targetFog = new THREE.Color(0x182535);
+    targetMoon = 1.2;
+    rainActive = true;
+  } else {
+    targetSky = new THREE.Color(0xeaf1fb);
+    targetFog = new THREE.Color(0xc7d5ea);
+    targetMoon = 0.9;
+    snowActive = true;
+  }
+
+  const blend = 1 - Math.exp(-dt * 1.4);
+  currentWeather.sky.lerp(targetSky, blend);
+  currentWeather.fog.lerp(targetFog, blend);
+  currentWeather.moonIntensity = THREE.MathUtils.lerp(currentWeather.moonIntensity, targetMoon, blend);
+  currentWeather.rainActive = rainActive;
+  currentWeather.snowActive = snowActive;
+
+  scene.background = currentWeather.sky;
+  scene.fog.color.copy(currentWeather.fog);
+  mountainMaterial.color.copy(currentWeather.fog).lerp(MOUNTAIN_BASE, 0.6);
+  moon.intensity = currentWeather.moonIntensity;
+  updateVehicleLights(cycle >= 0.24 && cycle < 0.82);
+  weatherParticles.rain.visible = currentWeather.rainActive;
+  weatherParticles.snow.visible = currentWeather.snowActive;
+
+  if (rainActive) {
+    const arr = weatherParticles.rain.geometry.attributes.position.array;
+    for (let i = 0; i < arr.length; i += 3) {
+      arr[i + 1] -= 16 * dt;
+      if (arr[i + 1] <= 1.5) {
+        arr[i] = (Math.random() - 0.5) * 130;
+        arr[i + 1] = 18 + Math.random() * 24;
+        arr[i + 2] = (Math.random() - 0.5) * 130;
+      }
+    }
+    weatherParticles.rain.geometry.attributes.position.needsUpdate = true;
+  }
+
+  if (snowActive) {
+    const arr = weatherParticles.snow.geometry.attributes.position.array;
+    for (let i = 0; i < arr.length; i += 3) {
+      arr[i + 1] -= 7 * dt;
+      arr[i] += Math.sin((elapsed + i) * 0.2) * 0.02;
+      if (arr[i + 1] <= 1.5) {
+        arr[i] = (Math.random() - 0.5) * 110;
+        arr[i + 1] = 8 + Math.random() * 28;
+        arr[i + 2] = (Math.random() - 0.5) * 110;
+      }
+    }
+    weatherParticles.snow.geometry.attributes.position.needsUpdate = true;
+  }
+}
 
 function startGame() {
   if (started) return;
@@ -578,16 +875,29 @@ function frame(now) {
   elapsed += dt;
 
   drive(dt);
+  updateWeather(dt);
   updateVertical(dt);
   animateWheels(dt);
   if (started) {
     collideCar(car, obstacles, debris, onStationBreak);
     updateSocials();
+    updateCardVisibility();
   } else {
     const pulse = 1 + Math.sin(elapsed * 3) * 0.04;
     startRings.forEach((r) => (r.scale.setScalar(pulse)));
   }
   debris.update(dt);
+  if (started && isWet() && car.speed > 4) {
+    splashTimer -= dt;
+    if (splashTimer <= 0) {
+      splashTimer = 0.09;
+      const c = Math.cos(car.yaw);
+      const s = Math.sin(car.yaw);
+      for (const side of [-1, 1]) {
+        debris.splash(car.x + c * 1.1 * side, car.y + 0.6, car.z - s * 1.1 * side, c * side, -s * side);
+      }
+    }
+  }
 
   carPivot.position.set(car.x, car.y, car.z);
   carPivot.rotation.y = car.yaw;
@@ -595,13 +905,14 @@ function frame(now) {
   moon.target.position.set(car.x, 0, car.z);
   updateCamera(dt);
 
+  if (waterTexture) waterTexture.offset.y = elapsed * 0.04;
   stationDiscs.forEach((d, i) => d.scale.setScalar(1 + Math.sin(elapsed * 2 + i) * 0.03));
 
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
 
-// Carga de assets de Bruno (MIT, ver FOLIO-2025-LICENSE.md y README) y arranque del juego.
+// Carga de assets del juego de Bruno Simon, adaptado por Roy, y arranque del juego.
 const loader = new GLTFLoader();
 const texLoader = new THREE.TextureLoader();
 const CAR_DIR = `${ASSETS}vehicle/2019/`;
@@ -620,11 +931,16 @@ Promise.all([
   });
 
   buildTrack(scene, curve);
+  buildRoundabout(scene, roundabout);
+  buildTunnels(scene, curve);
+  const water = buildWater(scene, curve, [...stationPos, ...socialItems], roundabout);
+  waterZones = water.zones;
+  waterTexture = water.texture;
   buildMarkers();
   buildStationCrates();
-  const scenery = buildScenery(scene, curve, [...stationPos, ...socialItems]);
+  const scenery = buildScenery(scene, curve, [...stationPos, ...socialItems], roundabout, waterZones);
   obstacles.push(...scenery.obstacles);
-  ramps = scenery.ramps;
+  ramps = [...scenery.ramps, buildBridge(scene, curve)];
   debris = createDebris(scene);
   buildStartRing();
   setupCar({ chassis, antena, brake, reverse, wheel }, matcaps);
