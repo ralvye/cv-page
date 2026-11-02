@@ -1,6 +1,7 @@
 ====================================================
   ralvye.com - CV en 3D
   Pagina personal estilo pista de carreras interactiva en Three.js
+  Rodrigo Alvear Yevenes
 ====================================================
 
 
