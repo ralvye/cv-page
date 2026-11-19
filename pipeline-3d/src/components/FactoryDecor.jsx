@@ -2,6 +2,8 @@ import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { RoundedBox, Text } from '@react-three/drei'
 import { MathUtils } from 'three'
+import HardHat from './HardHat.jsx'
+import { PURPLE, YELLOW } from '../data/palette.js'
 
 const MACHINE_POSITION = [1.8, 0, 0.9]
 const MACHINE_CONVEYOR_POSITION = [1.8, 0, 2.3]
@@ -9,8 +11,8 @@ const ARM_POSITION = [4.6, 0, -6]
 const SECOND_ARM_POSITION = [4.4, 0, 2.2]
 const WORKER_POSITION = [-6.6, 0, 1.6]
 const SCALABILITY_POSITION = [5.8, 0, -0.6]
-const MACHINE_BAR_COLORS = ['#3E9BE0', '#F5A623', '#4DB35A', '#7C6CF0']
-const CRATE_COLORS = ['#F5A623', '#4DB35A', '#3E9BE0']
+const MACHINE_BAR_COLORS = ['#3E9BE0', YELLOW, '#4DB35A', PURPLE]
+const CRATE_COLORS = [YELLOW, '#4DB35A', '#3E9BE0']
 
 function CicdEngine({ position }) {
   const barRefs = useRef([])
@@ -25,7 +27,7 @@ function CicdEngine({ position }) {
   return (
     <group position={position}>
       <RoundedBox args={[2.4, 2.2, 2]} radius={0.16} smoothness={4} position={[0, 1.1, 0]} castShadow receiveShadow>
-        <meshStandardMaterial color="#E6ECF2" roughness={0.4} metalness={0.2} />
+        <meshPhysicalMaterial color="#E6ECF2" roughness={0.25} metalness={0.2} clearcoat={0.5} clearcoatRoughness={0.2} />
       </RoundedBox>
       <RoundedBox args={[2.1, 0.3, 1.7]} radius={0.08} smoothness={3} position={[0, 2.35, 0]} castShadow>
         <meshStandardMaterial color="#C5CFDA" roughness={0.4} metalness={0.3} />
@@ -118,7 +120,7 @@ function RobotArm({ position, phase = 0 }) {
         </mesh>
         <mesh position={[1.4, 1.95, 0]} castShadow>
           <boxGeometry args={[0.5, 0.5, 0.5]} />
-          <meshStandardMaterial color="#F5A623" roughness={0.5} />
+          <meshStandardMaterial color={YELLOW} roughness={0.5} />
         </mesh>
       </group>
     </group>
@@ -136,10 +138,7 @@ function Worker({ position }) {
         <sphereGeometry args={[0.22, 20, 16]} />
         <meshStandardMaterial color="#F2C9A0" roughness={0.6} />
       </mesh>
-      <mesh position={[0, 1.17, 0]} castShadow>
-        <sphereGeometry args={[0.25, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2]} />
-        <meshStandardMaterial color="#F5C518" roughness={0.4} />
-      </mesh>
+      <HardHat />
       <RoundedBox args={[1.4, 1.4, 1.4]} radius={0.12} smoothness={3} position={[0, 0.7, 1]} castShadow receiveShadow>
         <meshStandardMaterial color="#8794A3" metalness={0.3} roughness={0.5} />
       </RoundedBox>
@@ -166,11 +165,11 @@ function Trophy({ position }) {
       </mesh>
       <mesh position={[0, 0.09, 0]}>
         <cylinderGeometry args={[0.04, 0.04, 0.1, 12]} />
-        <meshStandardMaterial color="#F5C518" metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial color={YELLOW} metalness={0.6} roughness={0.3} />
       </mesh>
       <mesh position={[0, 0.3, 0]} castShadow>
         <cylinderGeometry args={[0.26, 0.1, 0.32, 24]} />
-        <meshStandardMaterial color="#F5C518" metalness={0.6} roughness={0.3} />
+        <meshStandardMaterial color={YELLOW} metalness={0.6} roughness={0.3} />
       </mesh>
     </group>
   )
@@ -180,7 +179,7 @@ function ScalabilityBlock({ position }) {
   return (
     <group position={position}>
       <RoundedBox args={[2, 1.4, 2]} radius={0.14} smoothness={4} position={[0, 0.7, 0]} castShadow receiveShadow>
-        <meshStandardMaterial color="#3E7BC4" roughness={0.4} metalness={0.15} />
+        <meshPhysicalMaterial color="#3E7BC4" roughness={0.25} metalness={0.15} clearcoat={0.5} clearcoatRoughness={0.2} />
       </RoundedBox>
       <Text
         position={[0, 0.72, 1.01]}
@@ -207,7 +206,7 @@ function Padlock({ position, phase = 0 }) {
   return (
     <group ref={groupRef} position={position}>
       <RoundedBox args={[0.3, 0.26, 0.14]} radius={0.03} smoothness={2} castShadow>
-        <meshStandardMaterial color="#F5A623" metalness={0.4} roughness={0.35} />
+        <meshStandardMaterial color={YELLOW} metalness={0.4} roughness={0.35} />
       </RoundedBox>
       <mesh position={[0, 0.13, 0]} castShadow>
         <torusGeometry args={[0.1, 0.03, 10, 24, Math.PI]} />

@@ -1,3 +1,5 @@
+import { PURPLE, YELLOW } from './palette.js'
+
 export const stations = [
   {
     id: 'build',
@@ -22,7 +24,7 @@ export const stations = [
     id: 'test',
     name: 'TEST',
     subtitle: 'Habilidades validadas',
-    color: '#5E6B7A',
+    color: PURPLE,
     position: [-1.95, 0, 1.95],
     entries: [
       {
@@ -84,7 +86,8 @@ export const stations = [
     id: 'production',
     name: 'PRODUCTION',
     subtitle: 'Perfil y contacto',
-    color: '#F5A623',
+    color: YELLOW,
+    labelColor: '#14202E',
     position: [1.95, 0, -7.15],
     entries: [
       {

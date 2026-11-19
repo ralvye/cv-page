@@ -3,10 +3,11 @@ import { useFrame } from '@react-three/fiber'
 import { RoundedBox, Text } from '@react-three/drei'
 import { MathUtils, MeshStandardMaterial, Vector3 } from 'three'
 import { stations } from '../data/stations.js'
+import { PURPLE, YELLOW } from '../data/palette.js'
 
 const STATION_POINTS = stations.map((station) => new Vector3(...station.position))
 const SEGMENTS = STATION_POINTS.length - 1
-const ITEM_COLORS = ['#3E9BE0', '#F5A623', '#4DB35A', '#7C6CF0', '#8E9AAF', '#F06292']
+const ITEM_COLORS = ['#3E9BE0', YELLOW, '#4DB35A', PURPLE, '#8E9AAF', '#F06292']
 const ITEM_SPEED = 0.05
 const STATION_CLEARANCE = 1.4
 const FLASH_DURATION = 1.4
@@ -107,15 +108,15 @@ function ProductionIcon() {
     <group position={[0, 1.1, 1.12]}>
       <mesh position={[0, 0.1, 0]}>
         <cylinderGeometry args={[0.26, 0.1, 0.3, 24]} />
-        <meshStandardMaterial color="#FFF4D6" metalness={0.5} roughness={0.3} />
+        <meshStandardMaterial color="#14202E" metalness={0.5} roughness={0.3} />
       </mesh>
       <mesh position={[0, -0.12, 0]}>
         <cylinderGeometry args={[0.04, 0.04, 0.12, 12]} />
-        <meshStandardMaterial color="#FFF4D6" metalness={0.5} roughness={0.3} />
+        <meshStandardMaterial color="#14202E" metalness={0.5} roughness={0.3} />
       </mesh>
       <mesh position={[0, -0.22, 0]}>
         <boxGeometry args={[0.32, 0.08, 0.22]} />
-        <meshStandardMaterial color="#FFF4D6" metalness={0.5} roughness={0.3} />
+        <meshStandardMaterial color="#14202E" metalness={0.5} roughness={0.3} />
       </mesh>
     </group>
   )
@@ -166,7 +167,13 @@ function Station({ station, index, arrivals, isActive, onHover, onSelect }) {
         <meshStandardMaterial color="#F2FAFE" roughness={0.5} />
       </RoundedBox>
       <RoundedBox args={[2.2, 1.6, 2.2]} radius={0.14} smoothness={4} position={[0, 1.1, 0]} castShadow receiveShadow>
-        <meshStandardMaterial color={station.color} roughness={0.45} metalness={0.1} />
+        <meshPhysicalMaterial
+          color={station.color}
+          roughness={0.45}
+          metalness={0.1}
+          clearcoat={0.5}
+          clearcoatRoughness={0.2}
+        />
       </RoundedBox>
       <Visual glow={glow} />
       <Text
@@ -174,7 +181,7 @@ function Station({ station, index, arrivals, isActive, onHover, onSelect }) {
         rotation={[-Math.PI / 2, 0, 0]}
         fontSize={station.name.length > 6 ? 0.22 : 0.32}
         letterSpacing={0.04}
-        color="#FFFFFF"
+        color={station.labelColor ?? '#FFFFFF'}
         anchorX="center"
         anchorY="middle"
       >

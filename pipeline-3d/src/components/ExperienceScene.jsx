@@ -1,7 +1,10 @@
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useMemo } from 'react'
 import { Canvas, useThree } from '@react-three/fiber'
-import { ContactShadows, Grid, OrbitControls, OrthographicCamera, RoundedBox } from '@react-three/drei'
+import { ContactShadows, Environment, Grid, Lightformer, OrbitControls, OrthographicCamera, RoundedBox } from '@react-three/drei'
+import { CANVAS } from '../data/palette.js'
+import { createGrainTexture } from '../utils/grainTexture.js'
 import FactoryDecor from './FactoryDecor.jsx'
+import Inspectors from './Inspectors.jsx'
 import PipelineStations from './PipelineStations.jsx'
 
 const AZIMUTH_CENTER = Math.PI / 4
@@ -25,6 +28,9 @@ function FitCamera() {
 }
 
 function Platform() {
+  const grain = useMemo(() => createGrainTexture([10, 6]), [])
+  useEffect(() => () => grain.dispose(), [grain])
+
   return (
     <group rotation={[0, PLATFORM_ROTATION, 0]}>
       <RoundedBox args={[30, 0.5, 18]} radius={0.2} smoothness={4} position={[0, -0.25, 0]} receiveShadow>
@@ -32,7 +38,7 @@ function Platform() {
       </RoundedBox>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
         <planeGeometry args={[30, 18]} />
-        <meshStandardMaterial color="#F2FAFE" roughness={0.9} />
+        <meshStandardMaterial color="#F2FAFE" roughness={0.9} map={grain} />
       </mesh>
       <Grid
         args={[30, 18]}
@@ -58,7 +64,7 @@ export default function ExperienceScene({ onReady, activeId, onHover, onSelect }
       shadows="percentage"
       dpr={[1, 2]}
     >
-      <color attach="background" args={['#BFE6FA']} />
+      <color attach="background" args={[CANVAS]} />
       <ambientLight intensity={0.6} />
       <hemisphereLight args={['#FFFFFF', '#8FCBEE', 0.9]} />
       <directionalLight
@@ -75,9 +81,14 @@ export default function ExperienceScene({ onReady, activeId, onHover, onSelect }
       />
 
       <Suspense fallback={null}>
+        <Environment environmentIntensity={0.5}>
+          <Lightformer form="rect" intensity={1.5} position={[0, 10, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[20, 20, 1]} />
+          <Lightformer form="rect" intensity={0.6} color={CANVAS} position={[-10, 4, 8]} scale={[12, 6, 1]} />
+        </Environment>
         <Platform />
         <PipelineStations activeId={activeId} onHover={onHover} onSelect={onSelect} />
         <FactoryDecor />
+        <Inspectors />
         <ContactShadows position={[0, 0, 0]} opacity={0.35} scale={30} blur={2.5} far={6} color="#2B5C86" />
       </Suspense>
 
