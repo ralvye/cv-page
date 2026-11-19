@@ -1,16 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
-import { Billboard, Text } from '@react-three/drei'
+import { RoundedBox, Text } from '@react-three/drei'
 import { MathUtils, MeshStandardMaterial, Vector3 } from 'three'
 import { stations } from '../data/stations.js'
 
 const STATION_POINTS = stations.map((station) => new Vector3(...station.position))
 const SEGMENTS = STATION_POINTS.length - 1
-const ITEM_COUNT = 6
+const ITEM_COLORS = ['#3E9BE0', '#F5A623', '#4DB35A', '#7C6CF0', '#8E9AAF', '#F06292']
 const ITEM_SPEED = 0.05
-const STATION_CLEARANCE = 1.2
+const STATION_CLEARANCE = 1.4
 const FLASH_DURATION = 1.4
-const TOOL_ANGLES = [0, Math.PI / 2, Math.PI, (3 * Math.PI) / 2]
+const GLOW_MATERIALS = stations.map(
+  () =>
+    new MeshStandardMaterial({
+      color: '#FFFFFF',
+      emissive: '#1FD65F',
+      emissiveIntensity: 0.25,
+      roughness: 0.4,
+    }),
+)
 
 function pointAlongLine(progress) {
   const scaled = MathUtils.clamp(progress, 0, 1) * SEGMENTS
@@ -30,133 +38,107 @@ function Belt({ from, to }) {
     <group position={[middle.x, 0.12, middle.z]} rotation={[0, -angle, 0]}>
       <mesh castShadow receiveShadow>
         <boxGeometry args={[length, 0.12, 0.9]} />
-        <meshStandardMaterial color="#1A1A1A" roughness={0.6} metalness={0.5} />
+        <meshStandardMaterial color="#DCE6EF" roughness={0.6} metalness={0.2} />
       </mesh>
       {[-0.42, 0.42].map((z) => (
         <mesh key={z} position={[0, 0.07, z]}>
           <boxGeometry args={[length, 0.06, 0.05]} />
-          <meshStandardMaterial color="#36454F" roughness={0.3} metalness={0.8} />
+          <meshStandardMaterial color="#8794A3" roughness={0.3} metalness={0.6} />
         </mesh>
       ))}
     </group>
   )
 }
 
-function BuildNode({ glow }) {
+function BuildIcon() {
   return (
-    <>
-      <mesh position={[0, 0.6, 0]} castShadow>
-        <boxGeometry args={[1.6, 1.2, 1.6]} />
-        <meshStandardMaterial color="#36454F" metalness={0.6} roughness={0.35} />
+    <group position={[0, 1.1, 1.12]}>
+      <mesh>
+        <torusGeometry args={[0.42, 0.06, 12, 40]} />
+        <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
       </mesh>
-      <mesh position={[0, 1.22, 0]} material={glow}>
-        <boxGeometry args={[1.2, 0.06, 1.2]} />
+      <mesh>
+        <sphereGeometry args={[0.13, 16, 16]} />
+        <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
       </mesh>
-      <mesh position={[0, 1.8, 0]} material={glow} castShadow>
-        <sphereGeometry args={[0.26, 24, 24]} />
-      </mesh>
-    </>
+    </group>
   )
 }
 
-function TestGauge({ glow }) {
-  const spinRef = useRef(null)
-  useFrame((_, delta) => {
-    spinRef.current.rotation.y += delta * 0.6
-  })
-
+function TestIcon() {
   return (
-    <>
-      <mesh position={[0, 0.5, 0]} castShadow>
-        <cylinderGeometry args={[0.7, 0.8, 1, 6]} />
-        <meshStandardMaterial color="#36454F" metalness={0.7} roughness={0.3} />
+    <group position={[0, 1.1, 1.12]}>
+      <mesh>
+        <torusGeometry args={[0.42, 0.06, 12, 40]} />
+        <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
       </mesh>
-      <mesh position={[0, 1.5, 0]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <torusGeometry args={[0.85, 0.1, 16, 48]} />
-        <meshStandardMaterial color="#36454F" metalness={0.8} roughness={0.25} />
+      <mesh position={[-0.13, -0.02, 0]} rotation={[0, 0, Math.PI / 4]}>
+        <boxGeometry args={[0.1, 0.26, 0.05]} />
+        <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
       </mesh>
-      <group ref={spinRef} position={[0, 1.5, 0]}>
-        {TOOL_ANGLES.map((angle, i) => (
-          <mesh key={angle} position={[Math.cos(angle) * 0.85, 0, Math.sin(angle) * 0.85]} material={glow}>
-            {i % 2 ? <octahedronGeometry args={[0.2]} /> : <boxGeometry args={[0.28, 0.28, 0.28]} />}
-          </mesh>
-        ))}
-      </group>
-    </>
+      <mesh position={[0.08, 0.06, 0]} rotation={[0, 0, -Math.PI / 4]}>
+        <boxGeometry args={[0.1, 0.44, 0.05]} />
+        <meshStandardMaterial color="#FFFFFF" roughness={0.4} />
+      </mesh>
+    </group>
   )
 }
 
-function DeployRack({ glow }) {
+function DeployIcon({ glow }) {
   return (
-    <>
-      <mesh position={[0, 1.1, 0]} castShadow>
-        <boxGeometry args={[1.3, 2.2, 1.3]} />
-        <meshStandardMaterial color="#36454F" metalness={0.7} roughness={0.4} />
-      </mesh>
-      {[0, 1, 2, 3, 4].map((row) => (
-        <group key={row} position={[0, 0.35 + row * 0.42, 0.66]}>
+    <group position={[0, 1.1, 1.12]}>
+      {[-0.32, 0, 0.32].map((y) => (
+        <group key={y} position={[0, y, 0]}>
           <mesh>
-            <boxGeometry args={[1.1, 0.3, 0.04]} />
-            <meshStandardMaterial color="#1A1A1A" roughness={0.5} />
+            <boxGeometry args={[0.95, 0.22, 0.04]} />
+            <meshStandardMaterial color="#1E2A38" roughness={0.5} />
           </mesh>
-          <mesh position={[0.42, 0, 0.03]} material={glow}>
-            <sphereGeometry args={[0.04, 12, 12]} />
+          <mesh position={[0.34, 0, 0.03]} material={glow}>
+            <sphereGeometry args={[0.045, 12, 12]} />
           </mesh>
         </group>
       ))}
-    </>
+    </group>
   )
 }
 
-function ProductionPortal({ glow }) {
+function ProductionIcon() {
   return (
-    <>
-      <mesh position={[0, 0.25, 0]} castShadow>
-        <boxGeometry args={[1.4, 0.5, 1.4]} />
-        <meshStandardMaterial color="#36454F" metalness={0.6} roughness={0.4} />
+    <group position={[0, 1.1, 1.12]}>
+      <mesh position={[0, 0.1, 0]}>
+        <cylinderGeometry args={[0.26, 0.1, 0.3, 24]} />
+        <meshStandardMaterial color="#FFF4D6" metalness={0.5} roughness={0.3} />
       </mesh>
-      <group position={[0, 1.5, 0]} rotation={[0, Math.PI / 4, 0]}>
-        <mesh castShadow>
-          <torusGeometry args={[0.9, 0.1, 16, 48]} />
-          <meshStandardMaterial color="#36454F" metalness={0.8} roughness={0.25} />
-        </mesh>
-        <mesh material={glow}>
-          <circleGeometry args={[0.8, 48]} />
-        </mesh>
-      </group>
-    </>
+      <mesh position={[0, -0.12, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.12, 12]} />
+        <meshStandardMaterial color="#FFF4D6" metalness={0.5} roughness={0.3} />
+      </mesh>
+      <mesh position={[0, -0.22, 0]}>
+        <boxGeometry args={[0.32, 0.08, 0.22]} />
+        <meshStandardMaterial color="#FFF4D6" metalness={0.5} roughness={0.3} />
+      </mesh>
+    </group>
   )
 }
 
 const VISUALS = {
-  build: BuildNode,
-  test: TestGauge,
-  deploy: DeployRack,
-  production: ProductionPortal,
+  build: BuildIcon,
+  test: TestIcon,
+  deploy: DeployIcon,
+  production: ProductionIcon,
 }
 
 function Station({ station, index, arrivals, isActive, onHover, onSelect }) {
   const groupRef = useRef(null)
-  const [glow] = useState(
-    () =>
-      new MeshStandardMaterial({
-        color: '#2F4F2F',
-        emissive: '#39FF14',
-        emissiveIntensity: 0.25,
-        roughness: 0.4,
-        metalness: 0.2,
-      }),
-  )
+  const glow = GLOW_MATERIALS[index]
   const Visual = VISUALS[station.id]
-
-  useEffect(() => () => glow.dispose(), [glow])
 
   useFrame((state) => {
     const now = state.clock.elapsedTime
     const sinceArrival = now - arrivals.current[index]
     const flash = Math.max(0, 1 - sinceArrival / FLASH_DURATION)
     const blink = 0.5 + 0.5 * Math.sin(now * 30)
-    glow.emissiveIntensity = (isActive ? 0.5 : 0.18) + flash * blink * 1.8
+    GLOW_MATERIALS[index].emissiveIntensity = (isActive ? 0.6 : 0.25) + flash * blink * 2.2
 
     const targetScale = isActive ? 1.06 : 1
     groupRef.current.scale.setScalar(MathUtils.lerp(groupRef.current.scale.x, targetScale, 0.15))
@@ -180,18 +162,27 @@ function Station({ station, index, arrivals, isActive, onHover, onSelect }) {
         onSelect(station.id)
       }}
     >
-      <mesh position={[0, 0.05, 0]} material={glow} receiveShadow>
-        <cylinderGeometry args={[1.2, 1.3, 0.1, 40]} />
-      </mesh>
+      <RoundedBox args={[3, 0.3, 3]} radius={0.12} smoothness={3} position={[0, 0.15, 0]} receiveShadow>
+        <meshStandardMaterial color="#F2FAFE" roughness={0.5} />
+      </RoundedBox>
+      <RoundedBox args={[2.2, 1.6, 2.2]} radius={0.14} smoothness={4} position={[0, 1.1, 0]} castShadow receiveShadow>
+        <meshStandardMaterial color={station.color} roughness={0.45} metalness={0.1} />
+      </RoundedBox>
       <Visual glow={glow} />
-      <Billboard position={[0, 3.2, 0]}>
-        <Text fontSize={0.34} letterSpacing={0.12} color={isActive ? '#39FF14' : '#F0F0F0'} anchorY="bottom">
-          {station.name}
-        </Text>
-        <Text position={[0, -0.12, 0]} fontSize={0.18} color="#F0F0F0" fillOpacity={0.6} anchorY="top">
-          {station.subtitle}
-        </Text>
-      </Billboard>
+      <Text
+        position={[0, 1.93, 0.05]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        fontSize={station.name.length > 6 ? 0.22 : 0.32}
+        letterSpacing={0.04}
+        color="#FFFFFF"
+        anchorX="center"
+        anchorY="middle"
+      >
+        {station.name}
+      </Text>
+      <mesh position={[0.75, 1.97, -0.75]} material={glow}>
+        <cylinderGeometry args={[0.16, 0.16, 0.08, 20]} />
+      </mesh>
     </group>
   )
 }
@@ -199,19 +190,12 @@ function Station({ station, index, arrivals, isActive, onHover, onSelect }) {
 function ConveyorItems({ arrivals }) {
   const itemRefs = useRef([])
   const lastTime = useRef(0)
-  const offsets = useMemo(() => Array.from({ length: ITEM_COUNT }, (_, i) => i / ITEM_COUNT), [])
-  const material = useMemo(
-    () =>
-      new MeshStandardMaterial({
-        color: '#B8C2CC',
-        emissive: '#2F4F2F',
-        emissiveIntensity: 0.4,
-        metalness: 0.7,
-        roughness: 0.3,
-      }),
+  const offsets = useMemo(() => ITEM_COLORS.map((_, i) => i / ITEM_COLORS.length), [])
+  const materials = useMemo(
+    () => ITEM_COLORS.map((color) => new MeshStandardMaterial({ color, roughness: 0.45, metalness: 0.1 })),
     [],
   )
-  useEffect(() => () => material.dispose(), [material])
+  useEffect(() => () => materials.forEach((material) => material.dispose()), [materials])
 
   useFrame((state) => {
     const now = state.clock.elapsedTime
@@ -233,7 +217,7 @@ function ConveyorItems({ arrivals }) {
       const position = pointAlongLine(travelled % 1)
       const mesh = itemRefs.current[i]
       mesh.visible = STATION_POINTS.every((point) => point.distanceTo(position) >= STATION_CLEARANCE)
-      mesh.position.set(position.x, 0.42, position.z)
+      mesh.position.set(position.x, 0.36, position.z)
     })
   })
 
@@ -245,7 +229,7 @@ function ConveyorItems({ arrivals }) {
           ref={(element) => {
             itemRefs.current[i] = element
           }}
-          material={material}
+          material={materials[i]}
           castShadow
         >
           {i % 2 ? <sphereGeometry args={[0.2, 20, 20]} /> : <boxGeometry args={[0.36, 0.36, 0.36]} />}

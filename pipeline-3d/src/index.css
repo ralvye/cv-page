@@ -10,14 +10,14 @@
   }
 
   body {
-    @apply bg-petrol-deep font-mono text-ink antialiased;
+    @apply bg-canvas font-sans text-navy antialiased;
     overflow: hidden;
   }
 }
 
 @layer components {
   .glass-panel {
-    @apply rounded-lg border border-moss/70 bg-petrol/80 backdrop-blur-md;
-    box-shadow: 0 0 24px rgba(57, 255, 20, 0.08);
+    @apply rounded-xl border border-white/70 bg-white/85 backdrop-blur-md;
+    box-shadow: 0 10px 30px rgba(20, 32, 46, 0.18);
   }
 }

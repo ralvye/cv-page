@@ -3,7 +3,8 @@ export const stations = [
     id: 'build',
     name: 'BUILD',
     subtitle: 'Formación académica',
-    position: [-7, 0, -4],
+    color: '#3E9BE0',
+    position: [-3.9, 0, 6.5],
     entries: [
       {
         heading: 'Universidad Nacional Andrés Bello',
@@ -21,7 +22,8 @@ export const stations = [
     id: 'test',
     name: 'TEST',
     subtitle: 'Habilidades validadas',
-    position: [-2.5, 0, 2.5],
+    color: '#5E6B7A',
+    position: [-1.95, 0, 1.95],
     entries: [
       {
         heading: 'Stack DevOps',
@@ -48,7 +50,8 @@ export const stations = [
     id: 'deploy',
     name: 'DEPLOY',
     subtitle: 'Experiencia laboral',
-    position: [2.5, 0, -4],
+    color: '#4DB35A',
+    position: [0, 0, -2.6],
     entries: [
       {
         heading: 'BCI — DevOps Ing Senior',
@@ -81,7 +84,8 @@ export const stations = [
     id: 'production',
     name: 'PRODUCTION',
     subtitle: 'Perfil y contacto',
-    position: [7, 0, 2.5],
+    color: '#F5A623',
+    position: [1.95, 0, -7.15],
     entries: [
       {
         heading: 'Ingeniero DevOps Senior',
