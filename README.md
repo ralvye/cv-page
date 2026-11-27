@@ -9,7 +9,7 @@ Demo local: abrir `web/index.html` con cualquier servidor estático (por ejemplo
 ## Controles
 
 - **Teclado:** flechas o `W A S D` para acelerar, frenar/retroceder y girar.
-- **Celular:** joystick táctil. Toca y arrastra en cualquier parte de la pantalla: el auto acelera y gira hacia donde se mueve el dedo; arrastrar hacia abajo frena.
+- **Celular:** joystick táctil. Toca y arrastra en cualquier parte de la pantalla: el auto acelera y gira hacia donde se mueve el dedo; arrastrar hacia abajo frena y, parado, retrocede (reversa).
 - **Barra inferior:** flechas `←` `→` y puntos para saltar directo a una sección.
 
 ## Estructura

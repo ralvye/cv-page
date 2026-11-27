@@ -28,7 +28,6 @@ import './style.css';
 const N = stations.length;
 const ASSETS = import.meta.env.BASE_URL;
 const SOCIAL_RADIUS = 3.5;
-const SOCIAL_ARC = 7;
 const CAR_LENGTH = 3;
 const MAX_SPEED = 26;
 const WATER_MAX_SPEED = 9;
@@ -41,10 +40,11 @@ const STATION_COLOR = 0xe07b22;
 let wheelRigs = [];
 let steerDir = 0;
 let steerAngle = 0;
-let carLights = { head: [], tail: [] };
+let carLights = { head: [], tail: [], reverse: [] };
 
 const canvas = document.getElementById('scene');
 const card = document.getElementById('card');
+const gearEl = document.getElementById('gear');
 const dotsEl = document.getElementById('dots');
 const prevBtn = document.getElementById('prev');
 const nextBtn = document.getElementById('next');
@@ -111,6 +111,99 @@ function buildWeatherParticles() {
   scene.add(weatherParticles.snow);
 }
 buildWeatherParticles();
+
+// Hojas que el viento empuja alrededor del auto y pájaros que cruzan el cielo; solo de día (ver updateWeather).
+const LEAF_COUNT = 90;
+const LEAF_COLORS = [0xc8642a, 0xd9a13c, 0x9c4a1e, 0xb8862b, 0xa8432a].map((c) => new THREE.Color(c));
+const leafShape = new THREE.Shape();
+leafShape.moveTo(0, -0.12);
+leafShape.quadraticCurveTo(0.1, 0, 0, 0.12);
+leafShape.quadraticCurveTo(-0.1, 0, 0, -0.12);
+const leafMesh = new THREE.InstancedMesh(
+  new THREE.ShapeGeometry(leafShape),
+  new THREE.MeshLambertMaterial({ side: THREE.DoubleSide }),
+  LEAF_COUNT
+);
+const leaves = [];
+const leafDummy = new THREE.Object3D();
+for (let i = 0; i < LEAF_COUNT; i++) {
+  leafMesh.setColorAt(i, LEAF_COLORS[i % LEAF_COLORS.length]);
+  leaves.push({ x: 0, y: -5, z: 0, phase: Math.random() * Math.PI * 2, fall: 1 + Math.random() * 0.8 });
+}
+leafMesh.visible = false;
+leafMesh.frustumCulled = false;
+scene.add(leafMesh);
+
+const BIRD_COUNT = 5;
+const birdMat = new THREE.MeshBasicMaterial({ color: 0x2b2f38, side: THREE.DoubleSide });
+function birdWingGeo(side) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, -0.15, 0, 0.9 * side, 0.25, 0, 0.35 * side], 3));
+  return g;
+}
+const birds = [];
+for (let i = 0; i < BIRD_COUNT; i++) {
+  const group = new THREE.Group();
+  const wingL = new THREE.Mesh(birdWingGeo(1), birdMat);
+  const wingR = new THREE.Mesh(birdWingGeo(-1), birdMat);
+  group.add(wingL, wingR, new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.1, 0.1), birdMat));
+  group.scale.setScalar(1.8);
+  group.visible = false;
+  scene.add(group);
+  birds.push({ group, wingL, wingR, live: false, phase: Math.random() * Math.PI * 2, speed: 6 + Math.random() * 4 });
+}
+
+function spawnBird(b) {
+  const a = Math.random() * Math.PI * 2;
+  const dx = Math.cos(a);
+  const dz = Math.sin(a);
+  const side = (Math.random() - 0.5) * 80;
+  b.x = car.x + dx * 110 - dz * side;
+  b.z = car.z + dz * 110 + dx * side;
+  b.y = 12 + Math.random() * 10;
+  b.vx = -dx * b.speed;
+  b.vz = -dz * b.speed;
+  b.group.rotation.y = Math.atan2(-b.vz, b.vx);
+  b.live = true;
+}
+
+function updateBirds(dt, active) {
+  for (const b of birds) {
+    b.group.visible = active;
+    if (!active) continue;
+    if (!b.live || Math.hypot(b.x - car.x, b.z - car.z) > 170) spawnBird(b);
+    b.x += b.vx * dt;
+    b.z += b.vz * dt;
+    b.group.position.set(b.x, b.y + Math.sin(elapsed * 1.6 + b.phase) * 0.5, b.z);
+    const flap = Math.sin(elapsed * 10 + b.phase) * 0.6;
+    b.wingL.rotation.x = flap;
+    b.wingR.rotation.x = -flap;
+  }
+}
+
+function updateLeaves(dt, active) {
+  leafMesh.visible = active;
+  if (!active) return;
+  const windX = 1.4 + Math.sin(elapsed * 0.3) * 0.8;
+  const windZ = Math.sin(elapsed * 0.21) * 0.9;
+  for (let i = 0; i < LEAF_COUNT; i++) {
+    const l = leaves[i];
+    l.x += (windX + Math.sin(elapsed * 1.7 + l.phase) * 0.9) * dt;
+    l.z += (windZ + Math.cos(elapsed * 1.3 + l.phase) * 0.6) * dt;
+    l.y -= (l.fall + 0.6 * Math.sin(elapsed * 2.6 + l.phase)) * dt;
+    if (l.y < 0.3 || Math.hypot(l.x - car.x, l.z - car.z) > 55) {
+      l.x = car.x + (Math.random() - 0.5) * 90;
+      l.z = car.z + (Math.random() - 0.5) * 90;
+      l.y = 4 + Math.random() * 14;
+    }
+    leafDummy.position.set(l.x, l.y, l.z);
+    leafDummy.rotation.set(elapsed * 1.6 + l.phase, elapsed * 0.9 + l.phase * 2, Math.sin(elapsed * 2.3 + l.phase) * 1.2);
+    leafDummy.scale.setScalar(1.3);
+    leafDummy.updateMatrix();
+    leafMesh.setMatrixAt(i, leafDummy.matrix);
+  }
+  leafMesh.instanceMatrix.needsUpdate = true;
+}
 
 // Icono plano para el suelo: disco o etiqueta oscura con texto blanco; 'badge' es un cuadrado de marca.
 function iconTexture(text, shape, fill = '#251f2b') {
@@ -182,6 +275,8 @@ let ramps = [];
 let waterZones = [];
 let waterTextures = [];
 let splashTimer = 0;
+// Intensidad 0..1 del movimiento sobre el agua; sube y baja suave al entrar y salir.
+let wetness = 0;
 const MOUNTAIN_BASE = new THREE.Color(0x4f4478);
 const mountainMaterial = buildMountains(scene);
 let debris = null;
@@ -199,39 +294,20 @@ function buildMarkers() {
     return mesh;
   });
 
-  // Redes sociales en un arco frente al inicio, con su propio botón al estar cerca.
-  const arc = socials.filter((s) => !s.ring);
-  const arcItems = arc.map((s, i) => {
-    const t = arc.length > 1 ? i / (arc.length - 1) : 0.5;
-    const a = -Math.PI * 0.8 + t * Math.PI * 0.6;
-    const x = SOCIAL_ARC * Math.cos(a);
-    const z = SOCIAL_ARC * Math.sin(a);
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(3.4, 1.7).rotateX(-Math.PI / 2),
-      new THREE.MeshBasicMaterial({ map: iconTexture(s.label, 'pill'), transparent: true, depthWrite: false })
+  // Redes de la rotonda: cubos 3D con el logo oficial en el centro hueco; se rompen al pasar, como las cajas.
+  socialItems = socials.map((s, i) => {
+    const { x, z } = roundabout.icons[i];
+    const cube = new THREE.Mesh(
+      new THREE.BoxGeometry(4, 4, 4).translate(0, 2, 0),
+      new THREE.MeshStandardMaterial({ map: logoTexture(s.logo, s.color), roughness: 0.5 })
     );
-    mesh.position.set(x, 0.12, z);
-    scene.add(mesh);
+    const y = ROAD_LIFT + ICON_MOUND_H;
+    cube.position.set(x, y, z);
+    cube.castShadow = true;
+    scene.add(cube);
+    obstacles.push({ x, y: y + 2, z, r: 2.4, solid: false, drag: 0.7, group: cube, kind: 'social' });
     return { ...s, x, z };
   });
-
-  // Redes de la rotonda: cubos 3D con el logo oficial en el centro hueco; se rompen al pasar, como las cajas.
-  const ringItems = socials
-    .filter((s) => s.ring)
-    .map((s, i) => {
-      const { x, z } = roundabout.icons[i];
-      const cube = new THREE.Mesh(
-        new THREE.BoxGeometry(4, 4, 4).translate(0, 2, 0),
-        new THREE.MeshStandardMaterial({ map: logoTexture(s.logo, s.color), roughness: 0.5 })
-      );
-      cube.position.set(x, ROAD_LIFT + ICON_MOUND_H, z);
-      cube.castShadow = true;
-      scene.add(cube);
-      obstacles.push({ x, z, r: 2.4, solid: false, drag: 0.7, group: cube, kind: 'social', color: s.color });
-      return { ...s, x, z };
-    });
-
-  socialItems = [...arcItems, ...ringItems];
 }
 
 // Cajas naranjas sobre la pista: cada una lleva el número de la sección y se rompe al pasar.
@@ -261,6 +337,8 @@ function buildStationCrates() {
 // Auto: piezas del juego 2019 de Bruno Simon, adaptadas por Roy. Vienen con Z hacia arriba y el frente en +X;
 // se giran para que el frente quede en +Z, que es el sentido de marcha de carPivot.
 const carPivot = new THREE.Group();
+// Yaw al final, así el balanceo y el cabeceo se aplican en el marco del auto.
+carPivot.rotation.order = 'YXZ';
 scene.add(carPivot);
 
 // Color de matcap según el nombre de la pieza (o de su nodo padre); lo no reconocido es gris.
@@ -300,6 +378,44 @@ function glowSprite(rgb, scale) {
   const sprite = new THREE.Sprite(mat);
   sprite.scale.setScalar(scale);
   return sprite;
+}
+
+// Las piezas del auto no tienen UV, así que el grano y la mancha se calculan en espacio del modelo.
+function addPaintGrain(material) {
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vCarPos;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvCarPos = position;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+varying vec3 vCarPos;
+float carHash(vec3 p3) {
+  p3 = fract(p3 * 0.1031);
+  p3 += dot(p3, p3.zyx + 31.32);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float carNoise(vec3 x) {
+  vec3 i = floor(x);
+  vec3 f = fract(x);
+  f = f * f * (3.0 - 2.0 * f);
+  return mix(
+    mix(mix(carHash(i), carHash(i + vec3(1.0, 0.0, 0.0)), f.x),
+        mix(carHash(i + vec3(0.0, 1.0, 0.0)), carHash(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
+    mix(mix(carHash(i + vec3(0.0, 0.0, 1.0)), carHash(i + vec3(1.0, 0.0, 1.0)), f.x),
+        mix(carHash(i + vec3(0.0, 1.0, 1.0)), carHash(i + vec3(1.0, 1.0, 1.0)), f.x), f.y), f.z);
+}`
+      )
+      .replace(
+        '#include <color_fragment>',
+        `#include <color_fragment>
+  float paintGrain = carNoise(vCarPos * 60.0);
+  float paintMottle = carNoise(vCarPos * 6.0);
+  diffuseColor.rgb *= 0.93 + 0.07 * paintGrain + 0.08 * (paintMottle - 0.5);`
+      );
+  };
+  material.customProgramCacheKey = () => 'car-paint-grain';
 }
 
 function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
@@ -352,8 +468,12 @@ function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
   const tailR = new THREE.PointLight(0xff332d, 0, 14, 2);
   const headGlow = [glowSprite('255, 240, 190', 0.9), glowSprite('255, 240, 190', 0.9)];
   const tailGlow = [glowSprite('255, 60, 50', 0.7), glowSprite('255, 60, 50', 0.7)];
+  const reverseL = new THREE.PointLight(0xfff6d6, 0, 12, 2);
+  const reverseR = new THREE.PointLight(0xfff6d6, 0, 12, 2);
+  const reverseGlow = [glowSprite('255, 246, 214', 0.6), glowSprite('255, 246, 214', 0.6)];
+  reverseGlow.forEach((s) => (s.visible = false));
 
-  const lightMeshes = [frontLeft, frontRight, rearLeft, rearRight, ...headGlow, ...tailGlow];
+  const lightMeshes = [frontLeft, frontRight, rearLeft, rearRight, ...headGlow, ...tailGlow, ...reverseGlow];
   [
     { obj: frontLeft, pos: [1.05, -0.45, 0.8] },
     { obj: frontRight, pos: [1.05, 0.45, 0.8] },
@@ -367,6 +487,10 @@ function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
     { obj: headR, pos: [1.1, 0.45, 0.8] },
     { obj: tailL, pos: [-1.1, -0.45, 0.6] },
     { obj: tailR, pos: [-1.1, 0.45, 0.6] },
+    { obj: reverseL, pos: [-1.1, -0.3, 0.6] },
+    { obj: reverseR, pos: [-1.1, 0.3, 0.6] },
+    { obj: reverseGlow[0], pos: [-1.2, -0.3, 0.6] },
+    { obj: reverseGlow[1], pos: [-1.2, 0.3, 0.6] },
   ].forEach(({ obj, pos }) => {
     obj.position.set(...pos);
     parts.add(obj);
@@ -374,6 +498,7 @@ function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
   carLights = {
     head: [frontLeft, frontRight, headL, headR, ...headGlow],
     tail: [rearLeft, rearRight, tailL, tailR, ...tailGlow],
+    reverse: [reverseL, reverseR, ...reverseGlow],
   };
 
   const mats = {};
@@ -381,9 +506,12 @@ function setupCar({ chassis, antena, brake, reverse, wheel }, matcaps) {
     if (!o.isMesh) return;
     if (['head-light-left', 'head-light-right', 'tail-light-left', 'tail-light-right'].includes(o.name)) return;
     const c = matcapColor(o);
-    // Detalles grises y blancos un poco más oscuros; el rojo se satura más: el tinte multiplica el matcap.
-    const tint = { gray: 0x9a9a9a, white: 0xb4b4b4, red: 0xff1a10 };
-    mats[c] ??= new THREE.MeshMatcapMaterial({ matcap: matcaps[c], color: tint[c] ?? 0xffffff });
+    if (!mats[c]) {
+      // Detalles grises y blancos un poco más oscuros; el rojo se satura más: el tinte multiplica el matcap.
+      const tint = { gray: 0x9a9a9a, white: 0xb4b4b4, red: 0xff1a10 };
+      mats[c] = new THREE.MeshMatcapMaterial({ matcap: matcaps[c], color: tint[c] ?? 0xffffff });
+      addPaintGrain(mats[c]);
+    }
     o.material = mats[c];
     o.castShadow = true;
   });
@@ -426,6 +554,19 @@ function updateVehicleLights(isDark) {
     if (light.isPointLight) light.intensity = isDark ? 1.4 : 0;
     else light.visible = isDark;
   }
+}
+
+// Reversa: luces blancas traseras y el indicador R solo mientras el auto va hacia atrás.
+let reversing = false;
+function updateReverse() {
+  const on = started && car.speed < -0.5;
+  if (on === reversing) return;
+  reversing = on;
+  for (const light of carLights.reverse) {
+    if (light.isPointLight) light.intensity = on ? 2 : 0;
+    else light.visible = on;
+  }
+  gearEl.classList.toggle('on', on);
 }
 
 const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0, vy: 0, groundY: 0 };
@@ -668,16 +809,32 @@ function renderCard(i, instant = false) {
   const show = () => {
     card.replaceChildren(buildCard(stations[i], i));
     card.scrollTop = 0;
-    card.classList.add('show');
+    setCardShown(true);
   };
   if (instant) {
     show();
     return;
   }
-  card.classList.remove('show');
+  setCardShown(false);
   setTimeout(() => {
     if (token === cardToken) show();
-  }, 180);
+  }, CARD_EXIT_MS);
+}
+
+// La salida con animación solo arranca desde "mostrada": updateCardVisibility corre cada frame.
+const CARD_EXIT_MS = 380;
+let cardExitTimer = 0;
+
+function setCardShown(shown) {
+  if (shown) {
+    clearTimeout(cardExitTimer);
+    card.classList.remove('leave');
+    card.classList.add('show');
+  } else if (card.classList.contains('show')) {
+    card.classList.remove('show');
+    card.classList.add('leave');
+    cardExitTimer = setTimeout(() => card.classList.remove('leave'), CARD_EXIT_MS);
+  }
 }
 
 const dots = stations.map((st, i) => {
@@ -718,8 +875,7 @@ function setIndex(i, instant = false) {
 function updateCardVisibility() {
   const target = stationPos[index];
   const d = Math.hypot(car.x - target.x, car.z - target.z);
-  const visible = d < 18;
-  card.classList.toggle('show', visible);
+  setCardShown(d < 18);
 }
 
 // Lleva el auto a una sección (botones y puntos), unos metros antes de su caja.
@@ -846,6 +1002,9 @@ function updateWeather(dt) {
   updateVehicleLights(cycle >= 0.24 && cycle < 0.82);
   weatherParticles.rain.visible = currentWeather.rainActive;
   weatherParticles.snow.visible = currentWeather.snowActive;
+  const daylight = cycle < 0.42;
+  updateLeaves(dt, daylight);
+  updateBirds(dt, daylight);
 
   if (rainActive) {
     const arr = weatherParticles.rain.geometry.attributes.position.array;
@@ -890,22 +1049,32 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-// Anillo de luz alrededor del punto de inicio, visible hasta empezar.
+// Halo de luz alrededor del punto de inicio, visible hasta empezar. Usa un degradado radial
+// para que el borde se difumine en lugar de verse como aros sólidos.
 function buildStartRing() {
   const s = stationPos[0];
-  const y = 0.12;
-  const mat = (opacity) =>
-    new THREE.MeshBasicMaterial({ color: 0xb48cff, transparent: true, opacity, depthWrite: false, side: THREE.DoubleSide });
-  startRings = [
-    [3.4, 3.8, 0.95],
-    [3.8, 5.2, 0.3],
-  ].map(([inner, outer, opacity]) => {
-    const m = new THREE.Mesh(new THREE.RingGeometry(inner, outer, 96), mat(opacity));
-    m.rotation.x = -Math.PI / 2;
-    m.position.set(s.x, y, s.z);
-    scene.add(m);
-    return m;
+  const S = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = S;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  grad.addColorStop(0.45, 'rgba(255,255,255,0)');
+  grad.addColorStop(0.62, 'rgba(255,255,255,0.85)');
+  grad.addColorStop(0.74, 'rgba(255,255,255,0.45)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, S, S);
+  const mat = new THREE.MeshBasicMaterial({
+    color: 0xb48cff,
+    map: new THREE.CanvasTexture(canvas),
+    transparent: true,
+    opacity: 0.9,
+    depthWrite: false,
   });
+  const halo = new THREE.Mesh(new THREE.PlaneGeometry(13, 13).rotateX(-Math.PI / 2), mat);
+  halo.position.set(s.x, 0.12, s.z);
+  scene.add(halo);
+  startRings = [halo];
 }
 
 function frame(now) {
@@ -914,6 +1083,7 @@ function frame(now) {
   elapsed += dt;
 
   drive(dt);
+  updateReverse();
   updateWeather(dt);
   updateVertical(dt);
   animateWheels(dt);
@@ -938,8 +1108,13 @@ function frame(now) {
     }
   }
 
-  carPivot.position.set(car.x, car.y, car.z);
-  carPivot.rotation.y = car.yaw;
+  wetness += ((started && isWet() ? 1 : 0) - wetness) * Math.min(1, dt * 5);
+  const bob = Math.abs(Math.sin(elapsed * 4.2)) * 0.12 * wetness;
+  const roll = Math.sin(elapsed * 2.2) * 0.05 * wetness;
+  const pitch = Math.sin(elapsed * 3.1 + 1) * 0.03 * wetness;
+  const sway = Math.sin(elapsed * 2.6) * 0.05 * wetness;
+  carPivot.position.set(car.x, car.y + bob, car.z);
+  carPivot.rotation.set(pitch, car.yaw + sway, roll);
   moon.position.set(car.x - 40, 80, car.z - 30);
   moon.target.position.set(car.x, 0, car.z);
   updateCamera(dt);
@@ -970,7 +1145,7 @@ Promise.all([
   });
 
   buildTrack(scene, curve);
-  buildRoundabout(scene, roundabout);
+  const moundRamps = buildRoundabout(scene, roundabout);
   buildTunnels(scene, curve);
   const water = buildWater(scene, curve, [...stationPos, ...socialItems], roundabout);
   waterZones = water.zones;
@@ -979,7 +1154,7 @@ Promise.all([
   buildStationCrates();
   const scenery = buildScenery(scene, curve, [...stationPos, ...socialItems], roundabout, waterZones);
   obstacles.push(...scenery.obstacles);
-  ramps = [...scenery.ramps, buildBridge(scene, curve)];
+  ramps = [...scenery.ramps, ...moundRamps, buildBridge(scene, curve)];
   debris = createDebris(scene);
   buildStartRing();
   setupCar({ chassis, antena, brake, reverse, wheel }, matcaps);

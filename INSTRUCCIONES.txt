@@ -61,11 +61,12 @@ NOTAS TECNICAS
   - La escena es una pista procedural sobre pasto: la pista, los bordillos y el
     pasto se generan en el navegador, sin modelos 3D externos.
   - Cada estacion de la pista corresponde a una seccion del CV (content.js).
-  - Conduccion: flechas o WASD para manejar el auto; al pasar por un icono del suelo se abre su seccion.
+  - Conduccion: flechas o WASD para manejar el auto; abajo o S frena y, sin velocidad, retrocede (reversa).
+    Al pasar por un icono del suelo se abre su seccion.
     Cada seccion visitada cambia de color y el contador "Secciones: n/8" marca el avance.
     En el celular se usa un joystick tactil: toca y arrastra en cualquier parte de
     la pantalla. El auto acelera y gira hacia donde se mueve el dedo; arrastrar
-    hacia abajo frena.
+    hacia abajo frena y, parado, retrocede (reversa).
   - Los botones de la barra inferior (flechas y puntos) saltan directo a cada seccion.
 
 

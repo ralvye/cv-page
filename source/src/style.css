@@ -114,10 +114,10 @@ body {
   max-height: 72vh;
   overflow: auto;
   padding: 26px 28px;
-  background: rgba(19, 25, 39, 0.94);
-  border: 1px solid var(--line);
+  background: rgba(248, 250, 253, 0.97);
+  border: 1px solid #d3dae6;
   border-radius: 18px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 20px 60px rgba(5, 10, 25, 0.45);
   opacity: 0;
   transform: translateY(-50%) translateX(20px);
   transition: opacity 0.35s, transform 0.35s;
@@ -128,11 +128,30 @@ body {
   transform: translateY(-50%);
 }
 
+/* Salida: la tarjeta se desliza, gira y se desenfoca; sus bloques salen en cascada. */
+#card.leave {
+  opacity: 0;
+  transform: translateY(-50%) translateX(120px) scale(0.92) rotate(3deg);
+  filter: blur(6px);
+  transition: opacity 0.38s ease-in, transform 0.38s cubic-bezier(0.55, 0, 0.9, 0.4), filter 0.38s ease-in;
+}
+
+#card.leave > * {
+  opacity: 0;
+  transform: translateX(30px);
+  transition: opacity 0.22s ease-in, transform 0.3s cubic-bezier(0.55, 0, 0.9, 0.4);
+}
+
+#card.leave > :nth-child(2) { transition-delay: 0.03s; }
+#card.leave > :nth-child(3) { transition-delay: 0.06s; }
+#card.leave > :nth-child(4) { transition-delay: 0.09s; }
+#card.leave > :nth-child(5) { transition-delay: 0.12s; }
+
 #card p {
   margin: 4px 0 0;
   font-size: 14px;
   line-height: 1.5;
-  color: var(--muted);
+  color: #4a5468;
 }
 
 #card .eyebrow {
@@ -141,7 +160,7 @@ body {
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--accent);
+  color: #0e7490;
 }
 
 #card h1 {
@@ -149,25 +168,25 @@ body {
   font-size: clamp(24px, 3vw, 34px);
   font-weight: 800;
   line-height: 1.1;
-  color: var(--text);
+  color: #0b1220;
 }
 
 #card .lead {
   margin-top: 8px;
   font-size: 15px;
   line-height: 1.55;
-  color: var(--text);
+  color: #1b2433;
 }
 
 #card h2 {
   margin: 0 0 2px;
   font-size: 17px;
-  color: var(--text);
+  color: #0b1220;
 }
 
 .job {
   padding: 12px 0;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid #d3dae6;
 }
 
 .meta {
@@ -175,7 +194,7 @@ body {
   margin-bottom: 4px;
   font-size: 13px;
   font-weight: 700;
-  color: var(--accent);
+  color: #0e7490;
 }
 
 .list {
@@ -183,7 +202,7 @@ body {
   padding-left: 18px;
   font-size: 15px;
   line-height: 1.7;
-  color: var(--text);
+  color: #1b2433;
 }
 
 .links {
@@ -195,10 +214,10 @@ body {
 
 .links a {
   padding: 6px 12px;
-  color: var(--bg);
+  color: #fff;
   font-weight: 700;
   text-decoration: none;
-  background: var(--accent);
+  background: #0e7490;
   border-radius: 999px;
 }
 
@@ -293,7 +312,34 @@ body {
   opacity: 0.6;
 }
 
+/* Indicador de reversa: aparece solo cuando el auto va hacia atrás. */
+.gear {
+  position: fixed;
+  bottom: 76px;
+  left: 16px;
+  padding: 5px 12px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  color: #1a1400;
+  background: #ffd23f;
+  border-radius: 999px;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+
+.gear.on {
+  opacity: 1;
+  transform: scale(1);
+}
+
 @media (max-width: 760px) {
+  #card.leave {
+    transform: translateY(60px) scale(0.92) rotate(-2deg);
+  }
+
   #card {
     top: auto;
     right: 12px;

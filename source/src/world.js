@@ -226,8 +226,8 @@ function buildGround(scene) {
 
 // Cinta plana que sigue la pista entre los desplazamientos a y b (perpendiculares al eje).
 // t0..t1 limita el tramo de la pista que se dibuja (0..1).
-// Si fadeFrom está definido, la cinta se difumina de fadeFrom a t1 hasta desaparecer.
-function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT, t0 = 0, t1 = 1, fadeFrom = null) {
+// alphaAt(t), si se pasa, da la opacidad (0..1) en cada punto para difuminar la cinta.
+function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT, t0 = 0, t1 = 1, alphaAt = null) {
   const SEG = Math.max(1, Math.ceil(1200 * (t1 - t0)));
   const pos = [];
   const uv = [];
@@ -243,7 +243,7 @@ function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT,
     prev = p;
     pos.push(p.x + nx * a, lift, p.z + nz * a, p.x + nx * b, lift, p.z + nz * b);
     uv.push(0, len / 9, uRepeat, len / 9);
-    const alpha = fadeFrom === null ? 1 : Math.min(1, Math.max(0, (t1 - t) / (t1 - fadeFrom)));
+    const alpha = alphaAt === null ? 1 : alphaAt(t);
     rgba.push(1, 1, 1, alpha, 1, 1, 1, alpha);
     if (i < SEG) {
       const k = i * 2;
@@ -255,7 +255,7 @@ function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT,
   geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   geo.setIndex(index);
   geo.computeVertexNormals();
-  if (fadeFrom !== null) {
+  if (alphaAt !== null) {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(rgba, 4));
     material = material.clone();
     Object.assign(material, { vertexColors: true, transparent: true, depthWrite: false });
@@ -265,7 +265,8 @@ function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT,
   scene.add(mesh);
 }
 
-// Bordillos rojos y blancos a ambos lados del asfalto, con borde irregular y algo de suciedad.
+// Bloques rojos y blancos alternos a lo largo de la curva, con borde irregular y algo de suciedad.
+const KERB_BLOCKS = 22;
 function kerbTexture() {
   const S = 128;
   const rand = mulberry32(41);
@@ -277,7 +278,7 @@ function kerbTexture() {
   for (let y = 0; y < S; y++) {
     for (let x = 0; x < S; x++) {
       const i = y * S + x;
-      const isRed = x < S / 2 + (wear[i] - 0.5) * 8;
+      const isRed = (Math.floor(((y + (wear[i] - 0.5) * 4) / S) * KERB_BLOCKS) & 1) === 0;
       const dirt = clamp01((wear[i] - 0.45) * 1.8) * 0.35;
       for (let c = 0; c < 3; c++) {
         px[i * 4 + c] = mix(isRed ? red[c] : white[c], grime[c], dirt) * 255;
@@ -324,22 +325,67 @@ function ringCutT(curve) {
   return t;
 }
 
+// Inicio difuminado: la pista sube desde transparente hasta opaca en este tramo (0..1).
+const START_FADE_T = 0.05;
+// Distancia (en t) entre la meta y el punto donde la pista entra a la rotonda.
+const FINISH_GAP_T = 0.012;
+const FINISH_SQUARE = 0.6;
+
+// Cuadros blancos y negros: 2×2 cuadros por repetición de la textura.
+function checkerTexture() {
+  const S = 64;
+  const px = new Uint8ClampedArray(S * S * 4);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const white = (Math.floor(x / (S / 2)) + Math.floor(y / (S / 2))) % 2 === 0;
+      const c = white ? 245 : 20;
+      px.set([c, c, c, 255], (y * S + x) * 4);
+    }
+  }
+  return makeTexture(S, px);
+}
+
+// Línea de meta a cuadros que cruza toda la pista en t.
+function buildFinishLine(scene, curve, t) {
+  const p = curve.getPointAt(t);
+  const { nx, nz } = frameAt(curve, t);
+  const half = FINISH_SQUARE;
+  // Ancho en la dirección lateral (nx, nz); profundidad en la dirección de la pista (nz, -nx).
+  const at = (d, s) => [p.x + nx * s + nz * d, ROAD_LIFT + 0.06, p.z + nz * s - nx * d];
+  const pos = [];
+  for (const d of [-half, half]) {
+    for (const s of [-ROAD_HALF, ROAD_HALF]) pos.push(...at(d, s));
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 4, 0, 0, 1, 4, 1], 2));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
+  geo.setIndex([0, 2, 1, 1, 2, 3]);
+  const mat = new THREE.MeshStandardMaterial({ map: checkerTexture(), roughness: 0.6, side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+}
+
 export function buildTrack(scene, curve) {
   buildGround(scene);
   const kerbMat = new THREE.MeshStandardMaterial({ map: kerbTexture(), roughness: 0.7, side: THREE.DoubleSide });
   const asphaltMat = new THREE.MeshStandardMaterial({ ...asphaltMaps(), roughness: 0.95, side: THREE.DoubleSide });
   const lineMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.8, side: THREE.DoubleSide });
   const cut = ringCutT(curve);
-  buildStrip(scene, curve, -ROAD_HALF, ROAD_HALF, asphaltMat, 1, ROAD_LIFT, 0, cut);
-  buildStrip(scene, curve, ROAD_HALF - 0.22, ROAD_HALF, lineMat, 1.4, ROAD_LIFT + 0.04, 0, cut);
-  buildStrip(scene, curve, -ROAD_HALF, -ROAD_HALF + 0.22, lineMat, 1.4, ROAD_LIFT + 0.04, 0, cut);
+  const startIn = (t) => clamp01(t / START_FADE_T);
   // Tramo final difuminado: la pista se funde con el asfalto de la rotonda.
-  buildStrip(scene, curve, -ROAD_HALF, ROAD_HALF, asphaltMat, 1, ROAD_LIFT, cut, 1, cut);
-  buildStrip(scene, curve, ROAD_HALF - 0.22, ROAD_HALF, lineMat, 1.4, ROAD_LIFT + 0.04, cut, 1, cut);
-  buildStrip(scene, curve, -ROAD_HALF, -ROAD_HALF + 0.22, lineMat, 1.4, ROAD_LIFT + 0.04, cut, 1, cut);
+  const endOut = (t) => clamp01((1 - t) / (1 - cut));
+  buildStrip(scene, curve, -ROAD_HALF, ROAD_HALF, asphaltMat, 1, ROAD_LIFT, 0, cut, startIn);
+  buildStrip(scene, curve, ROAD_HALF - 0.22, ROAD_HALF, lineMat, 1.4, ROAD_LIFT + 0.04, 0, cut, startIn);
+  buildStrip(scene, curve, -ROAD_HALF, -ROAD_HALF + 0.22, lineMat, 1.4, ROAD_LIFT + 0.04, 0, cut, startIn);
+  buildStrip(scene, curve, -ROAD_HALF, ROAD_HALF, asphaltMat, 1, ROAD_LIFT, cut, 1, endOut);
+  buildStrip(scene, curve, ROAD_HALF - 0.22, ROAD_HALF, lineMat, 1.4, ROAD_LIFT + 0.04, cut, 1, endOut);
+  buildStrip(scene, curve, -ROAD_HALF, -ROAD_HALF + 0.22, lineMat, 1.4, ROAD_LIFT + 0.04, cut, 1, endOut);
+  buildFinishLine(scene, curve, cut - FINISH_GAP_T);
   for (const [t0, t1] of curveRanges(curve, cut)) {
-    buildStrip(scene, curve, ROAD_HALF + 0.02, ROAD_HALF + 0.22, kerbMat, 3.5, ROAD_LIFT, t0, t1);
-    buildStrip(scene, curve, -ROAD_HALF - 0.22, -ROAD_HALF - 0.02, kerbMat, 3.5, ROAD_LIFT, t0, t1);
+    buildStrip(scene, curve, ROAD_HALF + 0.02, ROAD_HALF + 0.22, kerbMat, 1, ROAD_LIFT, t0, t1);
+    buildStrip(scene, curve, -ROAD_HALF - 0.22, -ROAD_HALF - 0.02, kerbMat, 1, ROAD_LIFT, t0, t1);
   }
 }
 
@@ -347,8 +393,8 @@ export function buildTrack(scene, curve) {
 const RING_IN = 9;
 const RING_OUT = 19;
 const RING_MID = (RING_IN + RING_OUT) / 2;
-// Separación de los dos cubos con logo desde el centro, a cada lado de la pista.
-const ICON_SPREAD = 3;
+// Separación entre los tres cubos con logo (GitHub, LinkedIn, correo), a lo largo de la línea de la rotonda.
+const ICON_SPREAD = 5;
 
 export function roundaboutLayout(curve) {
   const end = curve.getPointAt(1);
@@ -357,12 +403,15 @@ export function roundaboutLayout(curve) {
   const x = end.x + n.x * RING_MID;
   const z = end.z + n.z * RING_MID;
   const at = (s) => ({ x: x + n.x * s, z: z + n.z * s });
-  return { x, z, rIn: RING_IN, rOut: RING_OUT, icons: [at(-ICON_SPREAD), at(ICON_SPREAD)] };
+  return { x, z, rIn: RING_IN, rOut: RING_OUT, icons: [at(-ICON_SPREAD), at(0), at(ICON_SPREAD)] };
 }
 
 // Altura del pequeño cerro bajo cada icono social; los cubos se apoyan en su cima.
 export const ICON_MOUND_H = 1.4;
+const ICON_MOUND_TOP = 2.4;
+const ICON_MOUND_BASE = 3.6;
 
+// Devuelve las plataformas de los cerros para que heightAt suba al auto por encima de ellos.
 export function buildRoundabout(scene, layout) {
   const asphaltMat = new THREE.MeshStandardMaterial({ ...asphaltMaps(), roughness: 0.95, side: THREE.DoubleSide });
   const lineMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.8, side: THREE.DoubleSide });
@@ -375,11 +424,12 @@ export function buildRoundabout(scene, layout) {
   place(new THREE.RingGeometry(layout.rIn, layout.rOut, 96), asphaltMat, ROAD_LIFT);
   place(new THREE.RingGeometry(layout.rIn, layout.rIn + 0.22, 96), lineMat, ROAD_LIFT + 0.04);
   place(new THREE.RingGeometry(layout.rOut - 0.22, layout.rOut, 96), lineMat, ROAD_LIFT + 0.04);
-  for (const icon of layout.icons) {
-    const mound = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 3.6, ICON_MOUND_H, 20), grassMat);
+  return layout.icons.map((icon) => {
+    const mound = new THREE.Mesh(new THREE.CylinderGeometry(ICON_MOUND_TOP, ICON_MOUND_BASE, ICON_MOUND_H, 20), grassMat);
     mound.position.set(icon.x, ROAD_LIFT + ICON_MOUND_H / 2, icon.z);
     scene.add(mound);
-  }
+    return { x: icon.x, z: icon.z, mound: true, h: ICON_MOUND_H, top: ICON_MOUND_TOP, base: ICON_MOUND_BASE };
+  });
 }
 
 // Charcos que cruzan la pista: tramos rectos donde el agua tapa el asfalto.
@@ -672,6 +722,26 @@ function barkMaps() {
   };
 }
 
+// Follaje en escala de grises: manchas de luz y sombra con grano fino; el color del material la tiñe.
+function foliageMaps() {
+  const S = 256;
+  const rand = mulberry32(71);
+  const blotch = fbm(S, 6, 6, 3, rand);
+  const grain = valueNoise(S, 64, 64, rand);
+  const height = new Float32Array(S * S);
+  const px = new Uint8ClampedArray(S * S * 4);
+  for (let i = 0; i < S * S; i++) {
+    const v = 0.55 * blotch[i] + 0.45 * grain[i];
+    height[i] = v;
+    px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = (0.72 + 0.28 * v) * 255;
+    px[i * 4 + 3] = 255;
+  }
+  return {
+    map: makeTexture(S, px, [2, 2]),
+    normalMap: normalMapTexture(S, height, 3, [2, 2]),
+  };
+}
+
 export function buildTunnels(scene, curve) {
   const wallMat = new THREE.MeshStandardMaterial({ color: 0x18272b, roughness: 0.96, metalness: 0.12 });
   const glowMat = new THREE.MeshStandardMaterial({ color: 0x111b24, emissive: 0x1d2a39, emissiveIntensity: 0.12, roughness: 0.82, metalness: 0.18 });
@@ -735,7 +805,8 @@ export function buildScenery(scene, curve, avoid, ring, water = []) {
   const trunkMat = new THREE.MeshStandardMaterial({ ...bark, color: TRUNK_COLOR, roughness: 1 });
   const coneGeo = new THREE.ConeGeometry(1, 1, 10).translate(0, 0.5, 0);
   const ballGeo = new THREE.IcosahedronGeometry(1, 1);
-  const foliageMats = FOLIAGE_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 1 }));
+  const foliage = foliageMaps();
+  const foliageMats = FOLIAGE_COLORS.map((c) => new THREE.MeshStandardMaterial({ ...foliage, color: c, roughness: 1 }));
   const rockGeo = new THREE.DodecahedronGeometry(1, 0);
   const rockMat = new THREE.MeshStandardMaterial({ color: ROCK_COLOR, roughness: 0.95, flatShading: true });
   const logGeo = new THREE.CylinderGeometry(0.55, 0.55, 4, 10).rotateX(Math.PI / 2);
@@ -983,6 +1054,11 @@ export function buildScenery(scene, curve, avoid, ring, water = []) {
 // Altura del suelo en (x, z): sube por la rampa y cae al terminarla.
 export function heightAt(ramps, x, z) {
   for (const r of ramps) {
+    if (r.mound) {
+      const d = Math.hypot(x - r.x, z - r.z);
+      if (d < r.base) return r.h * Math.min(1, (r.base - d) / (r.base - r.top));
+      continue;
+    }
     const dx = x - r.x;
     const dz = z - r.z;
     const s = dx * Math.sin(r.yaw) + dz * Math.cos(r.yaw);
@@ -1055,6 +1131,42 @@ export function createDebris(scene) {
         });
       }
     },
+    // Cubo con logo: se parte en trozos que conservan su porción de la textura, así el logo y sus colores no se pierden.
+    shatter(x, y, z, material, size = 4, n = 3) {
+      const step = size / n;
+      const half = (n - 1) / 2;
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          for (let k = 0; k < n; k++) {
+            const ox = (i - half) * step;
+            const oy = (j - half) * step;
+            const oz = (k - half) * step;
+            const shardGeo = new THREE.BoxGeometry(step * 0.96, step * 0.96, step * 0.96);
+            const uv = shardGeo.attributes.uv;
+            for (let v = 0; v < uv.count; v++) uv.setXY(v, (i + uv.getX(v)) / n, (j + uv.getY(v)) / n);
+            const mesh = new THREE.Mesh(shardGeo, material);
+            mesh.position.set(x + ox, y + oy, z + oz);
+            mesh.castShadow = true;
+            scene.add(mesh);
+            const dist = Math.hypot(ox, oy, oz) || 1;
+            const power = 6 + Math.random() * 6;
+            parts.push({
+              mesh,
+              vel: new THREE.Vector3(
+                (ox / dist) * power + (Math.random() - 0.5) * 2,
+                (oy / dist) * power + 5 + Math.random() * 4,
+                (oz / dist) * power + (Math.random() - 0.5) * 2
+              ),
+              spin: new THREE.Vector3(Math.random() * 8 - 4, Math.random() * 8 - 4, Math.random() * 8 - 4),
+              life: 2.2 + Math.random() * 0.8,
+              fire: false,
+              own: true,
+              shrink: true,
+            });
+          }
+        }
+      }
+    },
     burst(x, y, z, color, count = 10, power = 8) {
       for (let i = 0; i < count; i++) {
         const mesh = new THREE.Mesh(geo, matFor(color, color === 0xff8a2a ? 0.8 : 0.12));
@@ -1119,8 +1231,10 @@ export function createDebris(scene) {
           q.mesh.scale.setScalar(Math.max(0.1, s));
         }
         q.life -= dt;
+        if (q.shrink) q.mesh.scale.setScalar(Math.min(1, Math.max(0.01, q.life / 0.5)));
         if (q.life <= 0) {
           scene.remove(q.mesh);
+          if (q.own) q.mesh.geometry.dispose();
           parts.splice(i, 1);
         }
       }
@@ -1158,6 +1272,8 @@ export function collideCar(car, obstacles, debris, onStation) {
       car.y = Math.max(car.y, 0.9);
       debris.fireBurst(o.x, 1.3, o.z, 0xff8a2a, 20, 14);
       debris.burst(o.x, 1.2, o.z, 0xff8a2a, 18, 11);
+    } else if (o.kind === 'social') {
+      debris.shatter(o.x, o.y, o.z, o.group.material, 4, 3);
     } else {
       debris.burst(o.x, 0.6, o.z, o.color, 10, 7);
     }
