@@ -598,10 +598,16 @@ export function buildWater(scene, curve, avoid = [], ring = null) {
     depthWrite: false,
     side: THREE.DoubleSide,
   });
+  // Charcos sobre la pista: brillo propio y más reflejo para no confundirse con el asfalto de noche.
+  const puddle = material.clone();
+  puddle.emissive = new THREE.Color(0x8fd0ff);
+  puddle.emissiveMap = map;
+  puddle.emissiveIntensity = 1.5;
+  puddle.roughness = 0.04;
   const mud = new THREE.MeshStandardMaterial({ color: MUD_COLOR, roughness: 1 });
   const { zones, river, lakes } = waterLayout(curve, avoid, ring);
 
-  WATER_WINDOWS.forEach(([uA, uB]) => buildWaterStrip(scene, curve, uA, uB, material));
+  WATER_WINDOWS.forEach(([uA, uB]) => buildWaterStrip(scene, curve, uA, uB, puddle));
   scene.add(new THREE.Mesh(rectGeo(river.x, river.z, river.yaw, RIVER_ALONG + 1.4, RIVER_LAT + 1.4, 0.05), mud));
   scene.add(new THREE.Mesh(rectGeo(river.x, river.z, river.yaw, RIVER_ALONG, RIVER_LAT, WATER_LIFT), material));
   for (const lake of lakes) {
@@ -1052,25 +1058,28 @@ export function buildScenery(scene, curve, avoid, ring, water = []) {
 }
 
 // Altura del suelo en (x, z): sube por la rampa y cae al terminarla.
+// Los cerros solapados usan la mayor altura, así no hay valles entre ellos.
 export function heightAt(ramps, x, z) {
+  let mound = 0;
   for (const r of ramps) {
-    if (r.mound) {
-      const d = Math.hypot(x - r.x, z - r.z);
-      if (d < r.base) return r.h * Math.min(1, (r.base - d) / (r.base - r.top));
-      continue;
-    }
+    if (!r.mound) continue;
+    const d = Math.hypot(x - r.x, z - r.z);
+    if (d < r.base) mound = Math.max(mound, r.h * Math.min(1, (r.base - d) / (r.base - r.top)));
+  }
+  for (const r of ramps) {
+    if (r.mound) continue;
     const dx = x - r.x;
     const dz = z - r.z;
     const s = dx * Math.sin(r.yaw) + dz * Math.cos(r.yaw);
     const lat = dx * Math.cos(r.yaw) - dz * Math.sin(r.yaw);
     if (r.deck) {
       const a = Math.abs(s);
-      if (Math.abs(lat) <= r.w && a <= r.half + r.ramp) return r.h * Math.min(1, (r.half + r.ramp - a) / r.ramp);
+      if (Math.abs(lat) <= r.w && a <= r.half + r.ramp) return Math.max(mound, r.h * Math.min(1, (r.half + r.ramp - a) / r.ramp));
       continue;
     }
-    if (s >= 0 && s <= r.len && Math.abs(lat) <= ROAD_HALF) return (r.h * s) / r.len;
+    if (s >= 0 && s <= r.len && Math.abs(lat) <= ROAD_HALF) return Math.max(mound, (r.h * s) / r.len);
   }
-  return 0;
+  return mound;
 }
 
 // Partículas que salen al romper un obstáculo.
