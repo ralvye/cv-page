@@ -180,7 +180,7 @@ let socialItems = [];
 let obstacles = [];
 let ramps = [];
 let waterZones = [];
-let waterTexture = null;
+let waterTextures = [];
 let splashTimer = 0;
 const MOUNTAIN_BASE = new THREE.Color(0x4f4478);
 const mountainMaterial = buildMountains(scene);
@@ -430,7 +430,7 @@ function updateVehicleLights(isDark) {
 
 const car = { x: 0, z: 0, y: 0, yaw: 0, speed: 0, vy: 0, groundY: 0 };
 
-// Controles: teclado (flechas o WASD) y botones táctiles.
+// Controles: teclado (flechas o WASD) y joystick táctil.
 const KEY_ACTIONS = {
   ArrowUp: 'gas',
   KeyW: 'gas',
@@ -459,22 +459,60 @@ window.addEventListener('keyup', (e) => {
 });
 window.addEventListener('blur', () => {
   for (const k of Object.keys(input)) input[k] = false;
+  releaseJoy();
 });
 
-for (const btn of document.querySelectorAll('[data-act]')) {
-  const act = btn.dataset.act;
-  const on = (e) => {
-    e.preventDefault();
-    input[act] = true;
-  };
-  const off = () => {
-    input[act] = false;
-  };
-  btn.addEventListener('pointerdown', on);
-  btn.addEventListener('pointerup', off);
-  btn.addEventListener('pointerleave', off);
-  btn.addEventListener('pointercancel', off);
+// Joystick táctil: tocar acelera, arrastrar a los lados gira (analógico) y arrastrar hacia abajo frena.
+// El origen aparece donde se apoya el dedo; el pulgar se limita a JOY_RADIUS.
+const JOY_RADIUS = 52;
+const JOY_DEAD = 0.12;
+const JOY_BRAKE = 0.6;
+const JOY_UI = 'button, a, input, #start, #card, .nav, .social';
+const joyEl = document.getElementById('joy');
+const joyKnob = joyEl.querySelector('.joy-knob');
+const joy = { id: null, ox: 0, oy: 0, steer: 0, pull: 0 };
+
+function joyAxis(v) {
+  const a = Math.abs(v);
+  return a < JOY_DEAD ? 0 : (Math.sign(v) * (a - JOY_DEAD)) / (1 - JOY_DEAD);
 }
+
+function moveJoy(x, y) {
+  const dx = x - joy.ox;
+  const dy = y - joy.oy;
+  const k = Math.min(1, JOY_RADIUS / Math.hypot(dx, dy));
+  const kx = dx * k;
+  const ky = dy * k;
+  joyKnob.style.transform = `translate(${kx}px, ${ky}px)`;
+  joy.steer = joyAxis(kx / JOY_RADIUS);
+  joy.pull = ky / JOY_RADIUS;
+}
+
+function releaseJoy() {
+  joy.id = null;
+  joy.steer = 0;
+  joy.pull = 0;
+  joyEl.classList.remove('on');
+}
+
+window.addEventListener('pointerdown', (e) => {
+  if (e.pointerType !== 'touch' || joy.id !== null || !started) return;
+  if (e.target instanceof Element && e.target.closest(JOY_UI)) return;
+  joy.id = e.pointerId;
+  joy.ox = e.clientX;
+  joy.oy = e.clientY;
+  joyEl.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+  joyEl.classList.add('on');
+  moveJoy(e.clientX, e.clientY);
+});
+window.addEventListener('pointermove', (e) => {
+  if (e.pointerId === joy.id) moveJoy(e.clientX, e.clientY);
+});
+const endJoy = (e) => {
+  if (e.pointerId === joy.id) releaseJoy();
+};
+window.addEventListener('pointerup', endJoy);
+window.addEventListener('pointercancel', endJoy);
 
 // Mojado: dentro del río/lagos, pero no sobre el puente (car.groundY alto).
 function isWet() {
@@ -483,7 +521,9 @@ function isWet() {
 
 function drive(dt) {
   if (!started) return;
-  const { gas, brake, left, right } = input;
+  const pulling = joy.id !== null && joy.pull > JOY_BRAKE;
+  const gas = input.gas || (joy.id !== null && !pulling);
+  const brake = input.brake || pulling;
   if (gas) car.speed += 16 * dt;
   if (brake) car.speed -= (car.speed > 0.5 ? 26 : 10) * dt;
   if (!gas && !brake && car.speed !== 0) {
@@ -493,7 +533,8 @@ function drive(dt) {
   car.speed = Math.min(isWet() ? WATER_MAX_SPEED : MAX_SPEED, Math.max(-MAX_REVERSE, car.speed));
 
   const grip = Math.min(1.15, 0.42 + Math.abs(car.speed) / 16);
-  const steer = (right ? 1 : 0) - (left ? 1 : 0);
+  const keys = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+  const steer = Math.max(-1, Math.min(1, keys + joy.steer));
   steerDir = steer;
   const turnRate = 0.74 * (0.34 + grip);
   if (steer) car.yaw -= steer * turnRate * Math.sign(car.speed || 1) * dt;
@@ -903,7 +944,7 @@ function frame(now) {
   moon.target.position.set(car.x, 0, car.z);
   updateCamera(dt);
 
-  if (waterTexture) waterTexture.offset.y = elapsed * 0.04;
+  for (const tex of waterTextures) tex.offset.y = elapsed * 0.04;
   stationDiscs.forEach((d, i) => d.scale.setScalar(1 + Math.sin(elapsed * 2 + i) * 0.03));
 
   renderer.render(scene, camera);
@@ -933,7 +974,7 @@ Promise.all([
   buildTunnels(scene, curve);
   const water = buildWater(scene, curve, [...stationPos, ...socialItems], roundabout);
   waterZones = water.zones;
-  waterTexture = water.texture;
+  waterTextures = water.textures;
   buildMarkers();
   buildStationCrates();
   const scenery = buildScenery(scene, curve, [...stationPos, ...socialItems], roundabout, waterZones);

@@ -34,6 +34,82 @@ function mulberry32(seed) {
   };
 }
 
+const smooth = (t) => t * t * (3 - 2 * t);
+const mix = (a, b, t) => a + (b - a) * t;
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
+
+// Ruido de valor sobre una rejilla de cellsX × cellsY celdas: al envolver la textura no hay costuras.
+function valueNoise(S, cellsX, cellsY, rand) {
+  const grid = new Float32Array(cellsX * cellsY);
+  for (let i = 0; i < grid.length; i++) grid[i] = rand();
+  const out = new Float32Array(S * S);
+  for (let y = 0; y < S; y++) {
+    const fy = (y / S) * cellsY;
+    const y0 = Math.floor(fy);
+    const ty = smooth(fy - y0);
+    const r0 = (y0 % cellsY) * cellsX;
+    const r1 = ((y0 + 1) % cellsY) * cellsX;
+    for (let x = 0; x < S; x++) {
+      const fx = (x / S) * cellsX;
+      const x0 = Math.floor(fx);
+      const tx = smooth(fx - x0);
+      const c0 = x0 % cellsX;
+      const c1 = (x0 + 1) % cellsX;
+      out[y * S + x] = mix(mix(grid[r0 + c0], grid[r0 + c1], tx), mix(grid[r1 + c0], grid[r1 + c1], tx), ty);
+    }
+  }
+  return out;
+}
+
+// Suma de octavas: manchas grandes con detalle fino encima. Valores 0..1.
+function fbm(S, cellsX, cellsY, octaves, rand) {
+  const out = new Float32Array(S * S);
+  let amp = 1;
+  let total = 0;
+  for (let o = 0; o < octaves; o++) {
+    const n = valueNoise(S, cellsX << o, cellsY << o, rand);
+    for (let i = 0; i < out.length; i++) out[i] += n[i] * amp;
+    total += amp;
+    amp *= 0.5;
+  }
+  for (let i = 0; i < out.length; i++) out[i] /= total;
+  return out;
+}
+
+function makeTexture(S, pixels, repeat = [1, 1], srgb = true) {
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  c.getContext('2d').putImageData(new ImageData(pixels, S, S), 0, 0);
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(repeat[0], repeat[1]);
+  tex.anisotropy = 8;
+  if (srgb) tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+// Mapa de normales a partir de una altura 0..1: da relieve sin geometría extra.
+function normalMapTexture(S, height, strength, repeat = [1, 1]) {
+  const px = new Uint8ClampedArray(S * S * 4);
+  for (let y = 0; y < S; y++) {
+    const up = ((y + S - 1) % S) * S;
+    const down = ((y + 1) % S) * S;
+    for (let x = 0; x < S; x++) {
+      const left = (x + S - 1) % S;
+      const right = (x + 1) % S;
+      const dx = (height[y * S + left] - height[y * S + right]) * strength;
+      const dy = (height[down + x] - height[up + x]) * strength;
+      const inv = 1 / Math.hypot(dx, dy, 1);
+      const i = (y * S + x) * 4;
+      px[i] = (dx * inv * 0.5 + 0.5) * 255;
+      px[i + 1] = (dy * inv * 0.5 + 0.5) * 255;
+      px[i + 2] = (inv * 0.5 + 0.5) * 255;
+      px[i + 3] = 255;
+    }
+  }
+  return makeTexture(S, px, repeat, false);
+}
+
 function frameAt(curve, u) {
   const p = curve.getPointAt(u);
   const t = curve.getTangentAt(u);
@@ -54,87 +130,95 @@ export function poseAt(curve, u) {
   return { x: p.x, z: p.z, yaw };
 }
 
-// Pasto: plano grande que se funde con la niebla morada.
-function grassTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 512;
-  const g = c.getContext('2d');
-  g.fillStyle = '#254d22';
-  g.fillRect(0, 0, c.width, c.height);
-  for (let i = 0; i < 9600; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const s = 4 + Math.random() * 10;
-    const tone = Math.random() < 0.7 ? '#2f632f' : '#1a3e1d';
-    g.fillStyle = tone;
-    g.fillRect(x, y, s, s);
+// Pasto: parches de tono, hojas finas en vertical y zonas secas; el relieve va en el mapa de normales.
+function grassMaps() {
+  const S = 512;
+  const rand = mulberry32(11);
+  const patch = fbm(S, 3, 3, 4, rand);
+  const grain = fbm(S, 48, 48, 2, rand);
+  const blades = valueNoise(S, 160, 10, rand);
+  const dark = [0.08, 0.17, 0.06];
+  const light = [0.28, 0.45, 0.18];
+  const dry = [0.3, 0.29, 0.14];
+  const height = new Float32Array(S * S);
+  const px = new Uint8ClampedArray(S * S * 4);
+  for (let i = 0; i < S * S; i++) {
+    const h = 0.5 * grain[i] + 0.5 * blades[i];
+    height[i] = h;
+    const v = 0.5 * patch[i] + 0.5 * h + (rand() - 0.5) * 0.06;
+    const t = clamp01((v - 0.3) / 0.5);
+    const drySpot = clamp01((patch[i] - 0.6) * 6) * 0.5;
+    for (let c = 0; c < 3; c++) {
+      px[i * 4 + c] = mix(mix(dark[c], light[c], t), dry[c], drySpot) * 255;
+    }
+    px[i * 4 + 3] = 255;
   }
-  for (let i = 0; i < 360; i++) {
-    g.strokeStyle = 'rgba(0,0,0,0.08)';
-    g.beginPath();
-    g.moveTo(Math.random() * 512, 0);
-    g.lineTo(Math.random() * 512, 512);
-    g.stroke();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(18, 18);
-  tex.anisotropy = 8;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  return {
+    map: makeTexture(S, px, [18, 18]),
+    normalMap: normalMapTexture(S, height, 3, [18, 18]),
+  };
 }
 
-function asphaltTexture() {
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 512;
-  const g = c.getContext('2d');
-  g.fillStyle = '#2c2f35';
-  g.fillRect(0, 0, c.width, c.height);
-  for (let i = 0; i < 14000; i++) {
-    const x = Math.random() * 512;
-    const y = Math.random() * 512;
-    const a = 18 + Math.random() * 110;
-    g.fillStyle = `rgba(${120 + Math.random() * 24}, ${122 + Math.random() * 24}, ${129 + Math.random() * 22}, ${0.15 + Math.random() * 0.22})`;
-    g.fillRect(x, y, a * 0.3, a * 0.2);
+// Asfalto: base gris azulado, manchas de betún y piedrecillas claras con grano fino.
+function asphaltMaps() {
+  const S = 512;
+  const rand = mulberry32(23);
+  const tar = fbm(S, 4, 4, 3, rand);
+  const grit = valueNoise(S, 256, 256, rand);
+  const stones = valueNoise(S, 64, 64, rand);
+  const base = [0.24, 0.25, 0.28];
+  const stone = [0.46, 0.47, 0.49];
+  const height = new Float32Array(S * S);
+  const px = new Uint8ClampedArray(S * S * 4);
+  for (let i = 0; i < S * S; i++) {
+    const pebble = clamp01((stones[i] - 0.62) * 5);
+    const v = 0.5 + (tar[i] - 0.5) * 0.6 + (grit[i] - 0.5) * 0.25;
+    height[i] = 0.5 * grit[i] + pebble;
+    for (let c = 0; c < 3; c++) {
+      px[i * 4 + c] = mix(base[c] * (0.8 + 0.4 * v), stone[c], pebble * 0.7) * 255;
+    }
+    px[i * 4 + 3] = 255;
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(14, 10);
-  tex.anisotropy = 8;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  return {
+    map: makeTexture(S, px, [14, 10]),
+    normalMap: normalMapTexture(S, height, 4, [14, 10]),
+  };
 }
 
-// Madera de granja: tablones con vetas horizontales.
-function woodTexture() {
+// Madera de granja: tablones horizontales con juntas oscuras y vetas alargadas.
+function woodMaps() {
   const S = 256;
-  const c = document.createElement('canvas');
-  c.width = S;
-  c.height = S;
-  const g = c.getContext('2d');
-  g.fillStyle = '#9a6b3c';
-  g.fillRect(0, 0, S, S);
-  for (let i = 0; i < 90; i++) {
-    const y = Math.random() * S;
-    g.strokeStyle = `rgba(60, 35, 15, ${0.15 + Math.random() * 0.3})`;
-    g.lineWidth = 0.5 + Math.random() * 1.5;
-    g.beginPath();
-    g.moveTo(0, y);
-    g.bezierCurveTo(80, y + (Math.random() - 0.5) * 16, 180, y + (Math.random() - 0.5) * 16, S, y);
-    g.stroke();
+  const PLANKS = 4;
+  const plankH = S / PLANKS;
+  const rand = mulberry32(31);
+  const grain = valueNoise(S, 4, 32, rand);
+  const fibers = valueNoise(S, 8, 128, rand);
+  const tints = Array.from({ length: PLANKS }, () => 0.85 + rand() * 0.3);
+  const base = [0.6, 0.42, 0.24];
+  const height = new Float32Array(S * S);
+  const px = new Uint8ClampedArray(S * S * 4);
+  for (let y = 0; y < S; y++) {
+    const plank = Math.floor(y / plankH);
+    const seam = y % plankH < 2;
+    for (let x = 0; x < S; x++) {
+      const i = y * S + x;
+      const g = 0.6 * grain[i] + 0.4 * fibers[i];
+      const shade = tints[plank] * (0.8 + 0.4 * g) * (seam ? 0.45 : 1);
+      for (let c = 0; c < 3; c++) px[i * 4 + c] = base[c] * shade * 255;
+      px[i * 4 + 3] = 255;
+      height[i] = g - (seam ? 0.5 : 0);
+    }
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 8;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  return {
+    map: makeTexture(S, px),
+    normalMap: normalMapTexture(S, height, 6),
+  };
 }
 
 function buildGround(scene) {
   const grass = new THREE.Mesh(
     new THREE.PlaneGeometry(ARENA_HALF * 2 + 40, ARENA_HALF * 2 + 40).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ map: grassTexture(), color: 0x365a2c, roughness: 1 })
+    new THREE.MeshStandardMaterial({ ...grassMaps(), roughness: 1 })
   );
   grass.receiveShadow = true;
   scene.add(grass);
@@ -181,19 +265,27 @@ function buildStrip(scene, curve, a, b, material, uRepeat = 1, lift = ROAD_LIFT,
   scene.add(mesh);
 }
 
-// Bordillos rojos y blancos a ambos lados del asfalto.
+// Bordillos rojos y blancos a ambos lados del asfalto, con borde irregular y algo de suciedad.
 function kerbTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d');
-  g.fillStyle = '#d62b2b';
-  g.fillRect(0, 0, 32, 64);
-  g.fillStyle = '#f2f2f2';
-  g.fillRect(32, 0, 32, 64);
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  const S = 128;
+  const rand = mulberry32(41);
+  const wear = fbm(S, 8, 8, 3, rand);
+  const red = [0.72, 0.13, 0.12];
+  const white = [0.9, 0.9, 0.88];
+  const grime = [0.42, 0.38, 0.33];
+  const px = new Uint8ClampedArray(S * S * 4);
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const i = y * S + x;
+      const isRed = x < S / 2 + (wear[i] - 0.5) * 8;
+      const dirt = clamp01((wear[i] - 0.45) * 1.8) * 0.35;
+      for (let c = 0; c < 3; c++) {
+        px[i * 4 + c] = mix(isRed ? red[c] : white[c], grime[c], dirt) * 255;
+      }
+      px[i * 4 + 3] = 255;
+    }
+  }
+  return makeTexture(S, px);
 }
 
 // Tramos de la pista con curva cerrada: ahí van los bordillos rojos y blancos.
@@ -235,7 +327,7 @@ function ringCutT(curve) {
 export function buildTrack(scene, curve) {
   buildGround(scene);
   const kerbMat = new THREE.MeshStandardMaterial({ map: kerbTexture(), roughness: 0.7, side: THREE.DoubleSide });
-  const asphaltMat = new THREE.MeshStandardMaterial({ map: asphaltTexture(), color: 0x41464d, roughness: 0.95, side: THREE.DoubleSide });
+  const asphaltMat = new THREE.MeshStandardMaterial({ ...asphaltMaps(), roughness: 0.95, side: THREE.DoubleSide });
   const lineMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.8, side: THREE.DoubleSide });
   const cut = ringCutT(curve);
   buildStrip(scene, curve, -ROAD_HALF, ROAD_HALF, asphaltMat, 1, ROAD_LIFT, 0, cut);
@@ -272,7 +364,7 @@ export function roundaboutLayout(curve) {
 export const ICON_MOUND_H = 1.4;
 
 export function buildRoundabout(scene, layout) {
-  const asphaltMat = new THREE.MeshStandardMaterial({ map: asphaltTexture(), color: 0x41464d, roughness: 0.95, side: THREE.DoubleSide });
+  const asphaltMat = new THREE.MeshStandardMaterial({ ...asphaltMaps(), roughness: 0.95, side: THREE.DoubleSide });
   const lineMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.8, side: THREE.DoubleSide });
   const grassMat = new THREE.MeshStandardMaterial({ color: 0x4f8a3a, roughness: 0.95, flatShading: true });
   const place = (geo, mat, lift) => {
@@ -295,26 +387,34 @@ const WATER_WINDOWS = [[0.045, 0.06], [0.565, 0.58], [0.745, 0.76]];
 const WATER_HALF = ROAD_HALF + 0.22;
 const WATER_LIFT = ROAD_LIFT + 0.12;
 
-// Textura de agua: degradé azul con ondas que se repiten sin cortes.
-function waterTexture() {
-  const size = 256;
-  const c = document.createElement('canvas');
-  c.width = c.height = size;
-  const g = c.getContext('2d');
-  const grad = g.createLinearGradient(0, 0, 0, size);
-  grad.addColorStop(0, '#2a86b8');
-  grad.addColorStop(1, '#14507e');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, size, size);
+// Agua: degradé periódico (sin costuras) con relieve de ondas y crestas que se repiten.
+function waterMaps() {
+  const S = 256;
+  const rand = mulberry32(61);
+  const ripples = fbm(S, 8, 1, 3, rand);
+  const light = [0.165, 0.525, 0.72];
+  const dark = [0.078, 0.314, 0.494];
+  const px = new Uint8ClampedArray(S * S * 4);
+  for (let y = 0; y < S; y++) {
+    const band = 0.5 - 0.5 * Math.cos((2 * Math.PI * y) / S);
+    for (let x = 0; x < S; x++) {
+      const i = y * S + x;
+      const shade = 0.9 + 0.2 * ripples[i];
+      for (let c = 0; c < 3; c++) px[i * 4 + c] = mix(light[c], dark[c], band) * shade * 255;
+      px[i * 4 + 3] = 255;
+    }
+  }
+  const map = makeTexture(S, px);
+  const g = map.image.getContext('2d');
   g.strokeStyle = 'rgba(210, 240, 255, 0.6)';
   g.lineWidth = 2;
   for (let i = 0; i < 46; i++) {
-    const x = Math.random() * size;
-    const y = Math.random() * size;
-    const r = 6 + Math.random() * 16;
-    g.globalAlpha = 0.25 + Math.random() * 0.45;
-    for (const dx of [-size, 0, size]) {
-      for (const dy of [-size, 0, size]) {
+    const x = rand() * S;
+    const y = rand() * S;
+    const r = 6 + rand() * 16;
+    g.globalAlpha = 0.25 + rand() * 0.45;
+    for (const dx of [-S, 0, S]) {
+      for (const dy of [-S, 0, S]) {
         g.beginPath();
         g.arc(x + dx, y + dy, r, Math.PI * 0.1, Math.PI * 0.9);
         g.stroke();
@@ -322,10 +422,8 @@ function waterTexture() {
     }
   }
   g.globalAlpha = 1;
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  map.needsUpdate = true;
+  return { map, normalMap: normalMapTexture(S, ripples, 3) };
 }
 
 function buildWaterStrip(scene, curve, uA, uB, material) {
@@ -436,11 +534,12 @@ export function waterLayout(curve, avoid = [], ring = null) {
   return { zones, river, lakes: [...lakes, ...freeLakes] };
 }
 
-// Construye los charcos, el río y los lagos. Devuelve zonas y la textura para animarla.
+// Construye los charcos, el río y los lagos. Devuelve zonas y las texturas para animarlas.
 export function buildWater(scene, curve, avoid = [], ring = null) {
-  const texture = waterTexture();
+  const { map, normalMap } = waterMaps();
   const material = new THREE.MeshStandardMaterial({
-    map: texture,
+    map,
+    normalMap,
     color: 0xffffff,
     roughness: 0.08,
     metalness: 0.1,
@@ -459,7 +558,7 @@ export function buildWater(scene, curve, avoid = [], ring = null) {
     scene.add(new THREE.Mesh(discGeo(lake.x, lake.z, lake.r + 1.8, 0.05), mud));
     scene.add(new THREE.Mesh(discGeo(lake.x, lake.z, lake.r, WATER_LIFT), material));
   }
-  return { zones, texture };
+  return { zones, textures: [map, normalMap] };
 }
 
 // Puente sobre el río: rampas suaves, tablero de piedra con calzada de asfalto y pretiles de madera.
@@ -493,8 +592,8 @@ export function buildBridge(scene, curve) {
   const topBack = xsBack.map((x) => [x, rise(x)]);
 
   const stone = new THREE.MeshStandardMaterial({ color: RAMP_COLOR, roughness: 0.8, side: THREE.DoubleSide });
-  const asphalt = new THREE.MeshStandardMaterial({ map: asphaltTexture(), color: 0x41464d, roughness: 0.95, side: THREE.DoubleSide });
-  const wood = new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.9, side: THREE.DoubleSide });
+  const asphalt = new THREE.MeshStandardMaterial({ ...asphaltMaps(), roughness: 0.95, side: THREE.DoubleSide });
+  const wood = new THREE.MeshStandardMaterial({ ...woodMaps(), roughness: 0.9, side: THREE.DoubleSide });
 
   const group = new THREE.Group();
   group.position.copy(p);
@@ -551,29 +650,26 @@ const TIRE_COLOR = 0x1b1b1d;
 const BARREL_COLOR = 0x161a1f;
 const RAMP_COLOR = 0x8a8f99;
 
-function barkTexture() {
-  const c = document.createElement('canvas');
+// Corteza en escala de grises (el color del material la tiñe): surcos verticales y grano fino.
+function barkMaps() {
   const S = 256;
-  c.width = c.height = S;
-  const g = c.getContext('2d');
-  g.fillStyle = '#5d3b2a';
-  g.fillRect(0, 0, S, S);
-  for (let i = 0; i < 360; i++) {
-    const x = i * 7;
-    const amp = 16 + (i % 7) * 4;
-    const y = (i * 34) % S;
-    g.strokeStyle = i % 3 === 0 ? 'rgba(36, 22, 18, 0.7)' : 'rgba(82, 57, 42, 0.8)';
-    g.lineWidth = 3;
-    g.beginPath();
-    g.moveTo(x % S, 0);
-    g.bezierCurveTo(x % S, y, (x + amp) % S, y + 36, (x + amp * 1.3) % S, S);
-    g.stroke();
+  const rand = mulberry32(53);
+  const ridge = valueNoise(S, 24, 3, rand);
+  const fine = valueNoise(S, 48, 12, rand);
+  const height = new Float32Array(S * S);
+  const px = new Uint8ClampedArray(S * S * 4);
+  for (let i = 0; i < S * S; i++) {
+    const v = 0.6 * ridge[i] + 0.4 * fine[i];
+    const crack = clamp01(1 - Math.abs(ridge[i] - 0.5) / 0.03);
+    const shade = (0.7 + 0.3 * v) * (1 - 0.45 * crack);
+    height[i] = v - crack;
+    px[i * 4] = px[i * 4 + 1] = px[i * 4 + 2] = shade * 255;
+    px[i * 4 + 3] = 255;
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(2, 1);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+  return {
+    map: makeTexture(S, px, [2, 1]),
+    normalMap: normalMapTexture(S, height, 5, [2, 1]),
+  };
 }
 
 export function buildTunnels(scene, curve) {
@@ -634,16 +730,16 @@ export function buildScenery(scene, curve, avoid, ring, water = []) {
   const inArena = (x, z) => Math.abs(x) < ARENA_HALF - 10 && Math.abs(z) < ARENA_HALF - 10;
   const farFrom = (x, z, pts, r) => pts.every((p) => (p.x - x) ** 2 + (p.z - z) ** 2 > r * r);
 
-  const bark = barkTexture();
+  const bark = barkMaps();
   const trunkGeo = new THREE.CylinderGeometry(0.5, 0.72, 4.3, 10).translate(0, 2.15, 0);
-  const trunkMat = new THREE.MeshStandardMaterial({ map: bark, color: TRUNK_COLOR, roughness: 1 });
+  const trunkMat = new THREE.MeshStandardMaterial({ ...bark, color: TRUNK_COLOR, roughness: 1 });
   const coneGeo = new THREE.ConeGeometry(1, 1, 10).translate(0, 0.5, 0);
   const ballGeo = new THREE.IcosahedronGeometry(1, 1);
   const foliageMats = FOLIAGE_COLORS.map((c) => new THREE.MeshStandardMaterial({ color: c, roughness: 1 }));
   const rockGeo = new THREE.DodecahedronGeometry(1, 0);
   const rockMat = new THREE.MeshStandardMaterial({ color: ROCK_COLOR, roughness: 0.95, flatShading: true });
   const logGeo = new THREE.CylinderGeometry(0.55, 0.55, 4, 10).rotateX(Math.PI / 2);
-  const logMat = new THREE.MeshStandardMaterial({ map: bark, color: TRUNK_COLOR, roughness: 1 });
+  const logMat = new THREE.MeshStandardMaterial({ ...bark, color: TRUNK_COLOR, roughness: 1 });
   const tireGeo = new THREE.CylinderGeometry(0.85, 0.85, 0.55, 14);
   const tireMat = new THREE.MeshStandardMaterial({ color: TIRE_COLOR, roughness: 0.9 });
   const barrelGeo = new THREE.CylinderGeometry(0.72, 0.78, 1.5, 14);
@@ -840,7 +936,7 @@ export function buildScenery(scene, curve, avoid, ring, water = []) {
   const FENCE_RAILS = [0.35, 0.75, 1.1];
   const L = curve.getLength();
   const postGeo = new THREE.BoxGeometry(0.4, 1.3, 0.4).translate(0, 0.65, 0);
-  const fenceMat = new THREE.MeshStandardMaterial({ map: woodTexture(), roughness: 0.95 });
+  const fenceMat = new THREE.MeshStandardMaterial({ ...woodMaps(), roughness: 0.95 });
   let prevPost = null;
   for (let u = 0.03; u < 0.97; u += FENCE_GAP / L) {
     const turn = turnSine(curve, u);

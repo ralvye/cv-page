@@ -9,7 +9,7 @@ Demo local: abrir `web/index.html` con cualquier servidor estático (por ejemplo
 ## Controles
 
 - **Teclado:** flechas o `W A S D` para acelerar, frenar/retroceder y girar.
-- **Celular:** botones táctiles de la pantalla.
+- **Celular:** joystick táctil. Toca y arrastra en cualquier parte de la pantalla: el auto acelera y gira hacia donde se mueve el dedo; arrastrar hacia abajo frena.
 - **Barra inferior:** flechas `←` `→` y puntos para saltar directo a una sección.
 
 ## Estructura
@@ -24,7 +24,7 @@ cv-page/
     └── src/
         ├── main.js    Escena 3D, física del auto, cámara y pista
         ├── content.js Textos del CV (aquí se edita el contenido)
-        └── style.css  Tarjeta, barra de navegación y botones táctiles
+        └── style.css  Tarjeta, barra de navegación y joystick táctil
 ```
 
 ## Desarrollo

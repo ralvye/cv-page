@@ -28,6 +28,7 @@ body {
   height: 100%;
   display: block;
   outline: none;
+  touch-action: none;
 }
 
 .hint {
@@ -261,38 +262,35 @@ body {
   opacity: 0.85;
 }
 
-.pad {
+.joy {
   position: fixed;
-  bottom: 22px;
-  display: flex;
-  gap: 8px;
+  left: 0;
+  top: 0;
+  width: 160px;
+  height: 160px;
+  margin: -80px 0 0 -80px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  background: rgba(19, 25, 39, 0.16);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
 
-.pad.left {
-  left: 16px;
+.joy.on {
+  opacity: 1;
 }
 
-.pad.right {
-  right: 16px;
-}
-
-.pad button {
-  width: 34px;
-  height: 34px;
-  font-size: 13px;
-  color: var(--text);
-  background: rgba(19, 25, 39, 0.22);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 10px;
-  opacity: 0.55;
-  touch-action: none;
-  user-select: none;
-  cursor: pointer;
-}
-
-.pad button:active {
+.joy-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
+  border-radius: 50%;
   background: var(--accent);
-  color: var(--bg);
+  opacity: 0.6;
 }
 
 @media (max-width: 760px) {
@@ -318,11 +316,6 @@ body {
   #dots {
     display: none;
   }
-
-  .pad button {
-    width: 30px;
-    height: 30px;
-  }
 }
 
 /* Pantalla de inicio: fondo púrpura con puntos y texto dibujado a mano. */
@@ -344,8 +337,7 @@ body {
 }
 .idle .hint,
 .idle #card,
-.idle .nav,
-.idle .pad {
+.idle .nav {
   visibility: hidden;
 }
 .start-dots {

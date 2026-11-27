@@ -23,7 +23,7 @@ export const stations = [
     title: 'Rodrigo Alvear Yévenes',
     lead: 'Ingeniero DevOps Senior',
     blocks: [
-      { text: 'Maneja el auto con ↑ ↓ ← → (o W A S D). Pasa por encima de los iconos del suelo para abrir cada sección.' },
+      { text: 'Maneja el auto con ↑ ↓ ← → (o W A S D). En el celular, toca y arrastra como joystick. Pasa por encima de los iconos del suelo para abrir cada sección.' },
     ],
   },
   {
