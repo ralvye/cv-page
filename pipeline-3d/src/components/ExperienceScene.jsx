@@ -28,26 +28,33 @@ function FitCamera() {
 }
 
 function Platform() {
-  const grain = useMemo(() => createGrainTexture([10, 6]), [])
-  useEffect(() => () => grain.dispose(), [grain])
+  const gl = useThree((state) => state.gl)
+  const { map: grain, bumpMap } = useMemo(
+    () => createGrainTexture([10, 6], gl.capabilities.getMaxAnisotropy()),
+    [gl],
+  )
+  useEffect(() => () => {
+    grain.dispose()
+    bumpMap.dispose()
+  }, [grain, bumpMap])
 
   return (
     <group rotation={[0, PLATFORM_ROTATION, 0]}>
       <RoundedBox args={[30, 0.5, 18]} radius={0.2} smoothness={4} position={[0, -0.25, 0]} receiveShadow>
-        <meshStandardMaterial color="#8FCBEE" roughness={0.8} />
+        <meshStandardMaterial color="#5E9CC4" roughness={0.8} />
       </RoundedBox>
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
         <planeGeometry args={[30, 18]} />
-        <meshStandardMaterial color="#F2FAFE" roughness={0.9} map={grain} />
+        <meshStandardMaterial color="#A9C9DE" roughness={0.9} map={grain} bumpMap={bumpMap} bumpScale={1.5} />
       </mesh>
       <Grid
         args={[30, 18]}
         cellSize={1.5}
         cellThickness={0.5}
-        cellColor="#C9E6F7"
+        cellColor="#A9CDE3"
         sectionSize={6}
         sectionThickness={0.8}
-        sectionColor="#AFD8F1"
+        sectionColor="#8DBBD9"
         fadeDistance={40}
         fadeStrength={1}
         position={[0, 0.02, 0]}
@@ -66,7 +73,7 @@ export default function ExperienceScene({ onReady, activeId, onHover, onSelect }
     >
       <color attach="background" args={[CANVAS]} />
       <ambientLight intensity={0.6} />
-      <hemisphereLight args={['#FFFFFF', '#8FCBEE', 0.9]} />
+      <hemisphereLight args={['#FFFFFF', '#5E9CC4', 0.9]} />
       <directionalLight
         position={[8, 14, 6]}
         intensity={1.4}

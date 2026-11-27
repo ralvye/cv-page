@@ -15,8 +15,14 @@ const TURN_RATE = 6
 const MAX_FRAME_SECONDS = 0.1
 const RAISED_ARM_ANGLE = -1.3
 const SKIN_COLOR = '#F2C9A0'
-const TROUSER_COLOR = '#2B3A4A'
-const CHECK_COLOR = '#1FD65F'
+const TROUSER_COLOR = '#5F7389'
+const BOOT_COLOR = '#3F4E60'
+const VEST_COLOR = '#BCD97F'
+const REFLECTIVE_COLOR = '#E9EEF3'
+const BOARD_COLOR = '#C8B48F'
+const PAPER_COLOR = '#F4F6F8'
+const LINE_COLOR = '#AEB8C4'
+const CHECK_COLOR = '#5FAF78'
 
 // (u, v) are platform-local axes: world x = (u + v) / √2 and world z = (v - u) / √2.
 const CORNERS = [
@@ -119,6 +125,10 @@ function advance(walker, delta, now) {
 function LimbSet({ shirtColor }) {
   return (
     <>
+      <mesh>
+        <sphereGeometry args={[0.09, 14, 12]} />
+        <meshStandardMaterial color={shirtColor} roughness={0.55} />
+      </mesh>
       <RoundedBox args={[0.16, 0.52, 0.16]} radius={0.06} smoothness={2} position={[0, -0.26, 0]} castShadow>
         <meshStandardMaterial color={shirtColor} roughness={0.55} />
       </RoundedBox>
@@ -127,6 +137,19 @@ function LimbSet({ shirtColor }) {
         <meshStandardMaterial color={SKIN_COLOR} roughness={0.6} />
       </mesh>
     </>
+  )
+}
+
+function Leg({ legRef, x }) {
+  return (
+    <group ref={legRef} position={[x, 0.62, 0]}>
+      <RoundedBox args={[0.18, 0.62, 0.2]} radius={0.05} smoothness={2} position={[0, -0.31, 0]} castShadow>
+        <meshStandardMaterial color={TROUSER_COLOR} roughness={0.7} />
+      </RoundedBox>
+      <RoundedBox args={[0.2, 0.1, 0.26]} radius={0.03} smoothness={2} position={[0, -0.57, 0.03]} castShadow>
+        <meshStandardMaterial color={BOOT_COLOR} roughness={0.5} />
+      </RoundedBox>
+    </group>
   )
 }
 
@@ -164,41 +187,69 @@ function Inspector({ startArc }) {
 
   return (
     <group ref={rootRef}>
-      <group ref={leftLegRef} position={[-0.13, 0.62, 0]}>
-        <RoundedBox args={[0.18, 0.62, 0.2]} radius={0.05} smoothness={2} position={[0, -0.31, 0]} castShadow>
-          <meshStandardMaterial color={TROUSER_COLOR} roughness={0.7} />
-        </RoundedBox>
-      </group>
-      <group ref={rightLegRef} position={[0.13, 0.62, 0]}>
-        <RoundedBox args={[0.18, 0.62, 0.2]} radius={0.05} smoothness={2} position={[0, -0.31, 0]} castShadow>
-          <meshStandardMaterial color={TROUSER_COLOR} roughness={0.7} />
-        </RoundedBox>
-      </group>
-      <RoundedBox args={[0.5, 0.56, 0.3]} radius={0.08} smoothness={3} position={[0, 0.9, 0]} castShadow>
+      <Leg legRef={leftLegRef} x={-0.13} />
+      <Leg legRef={rightLegRef} x={0.13} />
+      <RoundedBox args={[0.5, 0.42, 0.3]} radius={0.08} smoothness={3} position={[0, 0.83, 0]} castShadow>
         <meshStandardMaterial color={PURPLE} roughness={0.55} />
       </RoundedBox>
-      <mesh position={[0, 0.8, 0.16]}>
-        <boxGeometry args={[0.52, 0.06, 0.02]} />
-        <meshStandardMaterial color="#F0F0F0" roughness={0.4} />
+      <RoundedBox args={[0.54, 0.38, 0.33]} radius={0.07} smoothness={3} position={[0, 0.83, 0]} castShadow>
+        <meshStandardMaterial color={VEST_COLOR} roughness={0.6} />
+      </RoundedBox>
+      {[0.96, 0.74].map((y) => (
+        <group key={y} position={[0, y, 0]}>
+          <mesh position={[0, 0, 0.168]}>
+            <boxGeometry args={[0.46, 0.04, 0.012]} />
+            <meshStandardMaterial color={REFLECTIVE_COLOR} metalness={0.3} roughness={0.3} />
+          </mesh>
+          <mesh position={[0, 0, -0.168]}>
+            <boxGeometry args={[0.46, 0.04, 0.012]} />
+            <meshStandardMaterial color={REFLECTIVE_COLOR} metalness={0.3} roughness={0.3} />
+          </mesh>
+        </group>
+      ))}
+      <mesh position={[0, 1.1, 0]}>
+        <cylinderGeometry args={[0.07, 0.08, 0.16, 12]} />
+        <meshStandardMaterial color={SKIN_COLOR} roughness={0.6} />
       </mesh>
-      <mesh position={[0, 1.15, 0]} castShadow>
+      <mesh position={[0, 1.3, 0]} castShadow>
         <sphereGeometry args={[0.2, 20, 16]} />
         <meshStandardMaterial color={SKIN_COLOR} roughness={0.6} />
       </mesh>
-      <HardHat />
-      <group ref={leftArmRef} position={[-0.33, 1.08, 0]}>
+      {/* HardHat is built at y 1.17; this lifts it onto the head at y 1.3. */}
+      <group position={[0, 0.15, 0]}>
+        <HardHat />
+      </group>
+      <group ref={leftArmRef} position={[-0.33, 1, 0]}>
         <LimbSet shirtColor={PURPLE} />
       </group>
-      <group ref={rightArmRef} position={[0.33, 1.08, 0]}>
+      <group ref={rightArmRef} position={[0.33, 1, 0]}>
         <LimbSet shirtColor={PURPLE} />
-        <mesh position={[0, -0.5, 0.1]} castShadow>
-          <boxGeometry args={[0.26, 0.34, 0.03]} />
-          <meshStandardMaterial color="#F0F0F0" roughness={0.5} />
-        </mesh>
-        <mesh position={[0.05, -0.46, 0.12]}>
-          <boxGeometry args={[0.1, 0.03, 0.02]} />
-          <meshStandardMaterial color={CHECK_COLOR} emissive={CHECK_COLOR} emissiveIntensity={0.6} />
-        </mesh>
+        <group position={[0, -0.5, 0.1]}>
+          <mesh castShadow>
+            <boxGeometry args={[0.26, 0.34, 0.03]} />
+            <meshStandardMaterial color={BOARD_COLOR} roughness={0.7} />
+          </mesh>
+          <mesh position={[0, 0, 0.018]}>
+            <boxGeometry args={[0.2, 0.26, 0.01]} />
+            <meshStandardMaterial color={PAPER_COLOR} roughness={0.5} />
+          </mesh>
+          <mesh position={[0, 0.16, 0.03]}>
+            <boxGeometry args={[0.1, 0.04, 0.03]} />
+            <meshStandardMaterial color={LINE_COLOR} metalness={0.4} roughness={0.4} />
+          </mesh>
+          <mesh position={[-0.01, 0.06, 0.025]}>
+            <boxGeometry args={[0.14, 0.014, 0.01]} />
+            <meshStandardMaterial color={LINE_COLOR} />
+          </mesh>
+          <mesh position={[-0.02, -0.04, 0.025]} rotation={[0, 0, -Math.PI / 4]}>
+            <boxGeometry args={[0.05, 0.025, 0.01]} />
+            <meshStandardMaterial color={CHECK_COLOR} emissive={CHECK_COLOR} emissiveIntensity={0.3} />
+          </mesh>
+          <mesh position={[0.035, -0.023, 0.025]} rotation={[0, 0, Math.PI / 4]}>
+            <boxGeometry args={[0.1, 0.025, 0.01]} />
+            <meshStandardMaterial color={CHECK_COLOR} emissive={CHECK_COLOR} emissiveIntensity={0.3} />
+          </mesh>
+        </group>
       </group>
     </group>
   )

@@ -5,7 +5,7 @@ export const stations = [
     id: 'build',
     name: 'BUILD',
     subtitle: 'Formación académica',
-    color: '#3E9BE0',
+    color: '#5B9BD5',
     position: [-3.9, 0, 6.5],
     entries: [
       {
@@ -52,7 +52,7 @@ export const stations = [
     id: 'deploy',
     name: 'DEPLOY',
     subtitle: 'Experiencia laboral',
-    color: '#4DB35A',
+    color: '#5FAF78',
     position: [0, 0, -2.6],
     entries: [
       {

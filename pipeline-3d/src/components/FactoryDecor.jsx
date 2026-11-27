@@ -11,8 +11,8 @@ const ARM_POSITION = [4.6, 0, -6]
 const SECOND_ARM_POSITION = [4.4, 0, 2.2]
 const WORKER_POSITION = [-6.6, 0, 1.6]
 const SCALABILITY_POSITION = [5.8, 0, -0.6]
-const MACHINE_BAR_COLORS = ['#3E9BE0', YELLOW, '#4DB35A', PURPLE]
-const CRATE_COLORS = [YELLOW, '#4DB35A', '#3E9BE0']
+const MACHINE_BAR_COLORS = ['#5B9BD5', YELLOW, '#5FAF78', PURPLE]
+const CRATE_COLORS = [YELLOW, '#5FAF78', '#5B9BD5']
 
 function CicdEngine({ position }) {
   const barRefs = useRef([])
@@ -27,10 +27,10 @@ function CicdEngine({ position }) {
   return (
     <group position={position}>
       <RoundedBox args={[2.4, 2.2, 2]} radius={0.16} smoothness={4} position={[0, 1.1, 0]} castShadow receiveShadow>
-        <meshPhysicalMaterial color="#E6ECF2" roughness={0.25} metalness={0.2} clearcoat={0.5} clearcoatRoughness={0.2} />
+        <meshPhysicalMaterial color="#BACBDB" roughness={0.25} metalness={0.2} clearcoat={0.5} clearcoatRoughness={0.2} />
       </RoundedBox>
       <RoundedBox args={[2.1, 0.3, 1.7]} radius={0.08} smoothness={3} position={[0, 2.35, 0]} castShadow>
-        <meshStandardMaterial color="#C5CFDA" roughness={0.4} metalness={0.3} />
+        <meshStandardMaterial color="#94A8BD" roughness={0.4} metalness={0.3} />
       </RoundedBox>
       <Text
         position={[0, 2.52, 0]}
@@ -45,7 +45,7 @@ function CicdEngine({ position }) {
       </Text>
       <mesh position={[0, 1, 1.01]}>
         <boxGeometry args={[1.8, 1.2, 0.04]} />
-        <meshStandardMaterial color="#1E2A38" roughness={0.3} />
+        <meshStandardMaterial color="#44566B" roughness={0.3} />
       </mesh>
       {MACHINE_BAR_COLORS.map((color, i) => (
         <mesh
@@ -77,7 +77,7 @@ function DecorConveyor({ position }) {
   return (
     <group position={position}>
       <RoundedBox args={[3.2, 0.25, 0.8]} radius={0.05} smoothness={2} position={[0, 0.13, 0]} castShadow receiveShadow>
-        <meshStandardMaterial color="#DCE6EF" roughness={0.6} metalness={0.2} />
+        <meshStandardMaterial color="#B3C6D6" roughness={0.6} metalness={0.2} />
       </RoundedBox>
       {CRATE_COLORS.map((color, i) => (
         <mesh
@@ -107,16 +107,16 @@ function RobotArm({ position, phase = 0 }) {
     <group position={position}>
       <mesh position={[0, 0.3, 0]} castShadow receiveShadow>
         <cylinderGeometry args={[0.5, 0.6, 0.6, 24]} />
-        <meshStandardMaterial color="#8E9AAF" metalness={0.5} roughness={0.4} />
+        <meshStandardMaterial color="#7D8BA0" metalness={0.5} roughness={0.4} />
       </mesh>
       <group ref={armRef} position={[0, 0.6, 0]}>
         <mesh position={[0, 1.2, 0]} castShadow>
           <boxGeometry args={[0.32, 2.4, 0.32]} />
-          <meshStandardMaterial color="#C5CFDA" metalness={0.4} roughness={0.35} />
+          <meshStandardMaterial color="#A9B8C8" metalness={0.4} roughness={0.35} />
         </mesh>
         <mesh position={[0.7, 2.4, 0]} castShadow>
           <boxGeometry args={[1.4, 0.28, 0.28]} />
-          <meshStandardMaterial color="#C5CFDA" metalness={0.4} roughness={0.35} />
+          <meshStandardMaterial color="#A9B8C8" metalness={0.4} roughness={0.35} />
         </mesh>
         <mesh position={[1.4, 1.95, 0]} castShadow>
           <boxGeometry args={[0.5, 0.5, 0.5]} />
@@ -132,7 +132,7 @@ function Worker({ position }) {
     <group position={position} rotation={[0, Math.PI / 2, 0]}>
       <mesh position={[0, 0.55, 0]} castShadow>
         <capsuleGeometry args={[0.24, 0.5, 6, 14]} />
-        <meshStandardMaterial color="#3E7BC4" roughness={0.6} />
+        <meshStandardMaterial color="#5B86BC" roughness={0.6} />
       </mesh>
       <mesh position={[0, 1.15, 0]} castShadow>
         <sphereGeometry args={[0.22, 20, 16]} />
@@ -140,7 +140,7 @@ function Worker({ position }) {
       </mesh>
       <HardHat />
       <RoundedBox args={[1.4, 1.4, 1.4]} radius={0.12} smoothness={3} position={[0, 0.7, 1]} castShadow receiveShadow>
-        <meshStandardMaterial color="#8794A3" metalness={0.3} roughness={0.5} />
+        <meshStandardMaterial color="#7A8799" metalness={0.3} roughness={0.5} />
       </RoundedBox>
       <Text
         position={[0, 0.7, 1.73]}
@@ -161,7 +161,7 @@ function Trophy({ position }) {
     <group position={position}>
       <mesh position={[0, 0.03, 0]} castShadow>
         <boxGeometry args={[0.4, 0.06, 0.4]} />
-        <meshStandardMaterial color="#2B3A4A" roughness={0.4} />
+        <meshStandardMaterial color="#44566B" roughness={0.4} />
       </mesh>
       <mesh position={[0, 0.09, 0]}>
         <cylinderGeometry args={[0.04, 0.04, 0.1, 12]} />
@@ -179,7 +179,7 @@ function ScalabilityBlock({ position }) {
   return (
     <group position={position}>
       <RoundedBox args={[2, 1.4, 2]} radius={0.14} smoothness={4} position={[0, 0.7, 0]} castShadow receiveShadow>
-        <meshPhysicalMaterial color="#3E7BC4" roughness={0.25} metalness={0.15} clearcoat={0.5} clearcoatRoughness={0.2} />
+        <meshPhysicalMaterial color="#5B86BC" roughness={0.25} metalness={0.15} clearcoat={0.5} clearcoatRoughness={0.2} />
       </RoundedBox>
       <Text
         position={[0, 0.72, 1.01]}
@@ -210,7 +210,7 @@ function Padlock({ position, phase = 0 }) {
       </RoundedBox>
       <mesh position={[0, 0.13, 0]} castShadow>
         <torusGeometry args={[0.1, 0.03, 10, 24, Math.PI]} />
-        <meshStandardMaterial color="#8E9AAF" metalness={0.7} roughness={0.3} />
+        <meshStandardMaterial color="#7D8BA0" metalness={0.7} roughness={0.3} />
       </mesh>
     </group>
   )

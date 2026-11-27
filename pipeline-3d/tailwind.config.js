@@ -4,12 +4,12 @@ export default {
   theme: {
     extend: {
       colors: {
-        canvas: { DEFAULT: '#A8D6F0', deep: '#8FCBEE' },
+        canvas: { DEFAULT: '#7FB7D8', deep: '#5E9CC4' },
         navy: { DEFAULT: '#14202E', soft: '#4A5B6E' },
         signal: '#1FD65F',
-        build: { DEFAULT: '#3E9BE0', deep: '#2B7BC4' },
-        deploy: { DEFAULT: '#4DB35A', deep: '#1F8A4C' },
-        prod: { DEFAULT: '#FFC400', deep: '#B38600' },
+        build: { DEFAULT: '#5B9BD5', deep: '#3E74A8' },
+        deploy: { DEFAULT: '#5FAF78', deep: '#2F7A4D' },
+        prod: { DEFAULT: '#E0BC62', deep: '#9C7A24' },
       },
       fontFamily: {
         sans: ['"Segoe UI"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],

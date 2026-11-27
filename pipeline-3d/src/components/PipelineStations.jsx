@@ -7,7 +7,7 @@ import { PURPLE, YELLOW } from '../data/palette.js'
 
 const STATION_POINTS = stations.map((station) => new Vector3(...station.position))
 const SEGMENTS = STATION_POINTS.length - 1
-const ITEM_COLORS = ['#3E9BE0', YELLOW, '#4DB35A', PURPLE, '#8E9AAF', '#F06292']
+const ITEM_COLORS = ['#5B9BD5', YELLOW, '#5FAF78', PURPLE, '#8E9AAF', '#E58DB0']
 const ITEM_SPEED = 0.05
 const STATION_CLEARANCE = 1.4
 const FLASH_DURATION = 1.4
@@ -39,12 +39,12 @@ function Belt({ from, to }) {
     <group position={[middle.x, 0.12, middle.z]} rotation={[0, -angle, 0]}>
       <mesh castShadow receiveShadow>
         <boxGeometry args={[length, 0.12, 0.9]} />
-        <meshStandardMaterial color="#DCE6EF" roughness={0.6} metalness={0.2} />
+        <meshStandardMaterial color="#B3C6D6" roughness={0.6} metalness={0.2} />
       </mesh>
       {[-0.42, 0.42].map((z) => (
         <mesh key={z} position={[0, 0.07, z]}>
           <boxGeometry args={[length, 0.06, 0.05]} />
-          <meshStandardMaterial color="#8794A3" roughness={0.3} metalness={0.6} />
+          <meshStandardMaterial color="#6F7E8F" roughness={0.3} metalness={0.6} />
         </mesh>
       ))}
     </group>
@@ -92,7 +92,7 @@ function DeployIcon({ glow }) {
         <group key={y} position={[0, y, 0]}>
           <mesh>
             <boxGeometry args={[0.95, 0.22, 0.04]} />
-            <meshStandardMaterial color="#1E2A38" roughness={0.5} />
+            <meshStandardMaterial color="#44566B" roughness={0.5} />
           </mesh>
           <mesh position={[0.34, 0, 0.03]} material={glow}>
             <sphereGeometry args={[0.045, 12, 12]} />
@@ -108,15 +108,15 @@ function ProductionIcon() {
     <group position={[0, 1.1, 1.12]}>
       <mesh position={[0, 0.1, 0]}>
         <cylinderGeometry args={[0.26, 0.1, 0.3, 24]} />
-        <meshStandardMaterial color="#14202E" metalness={0.5} roughness={0.3} />
+        <meshStandardMaterial color="#44566B" metalness={0.5} roughness={0.3} />
       </mesh>
       <mesh position={[0, -0.12, 0]}>
         <cylinderGeometry args={[0.04, 0.04, 0.12, 12]} />
-        <meshStandardMaterial color="#14202E" metalness={0.5} roughness={0.3} />
+        <meshStandardMaterial color="#44566B" metalness={0.5} roughness={0.3} />
       </mesh>
       <mesh position={[0, -0.22, 0]}>
         <boxGeometry args={[0.32, 0.08, 0.22]} />
-        <meshStandardMaterial color="#14202E" metalness={0.5} roughness={0.3} />
+        <meshStandardMaterial color="#44566B" metalness={0.5} roughness={0.3} />
       </mesh>
     </group>
   )
@@ -164,7 +164,7 @@ function Station({ station, index, arrivals, isActive, onHover, onSelect }) {
       }}
     >
       <RoundedBox args={[3, 0.3, 3]} radius={0.12} smoothness={3} position={[0, 0.15, 0]} receiveShadow>
-        <meshStandardMaterial color="#F2FAFE" roughness={0.5} />
+        <meshStandardMaterial color="#BCD2E1" roughness={0.5} />
       </RoundedBox>
       <RoundedBox args={[2.2, 1.6, 2.2]} radius={0.14} smoothness={4} position={[0, 1.1, 0]} castShadow receiveShadow>
         <meshPhysicalMaterial
